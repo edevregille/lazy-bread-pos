@@ -12,18 +12,23 @@ import { Product, Cart, LogLevel} from './types';
 
 const products: Product[] = [
   {
-    id: 'soup',
-    name: 'Soup',
+    id: 'small_soup',
+    name: 'Small Soup',
     unitCost: 5,
   },
   {
-    id: 'bread',
-    name: 'Bread',
+    id: 'large_soup',
+    name: 'Large Soup',
     unitCost: 8,
   },
   {
-    id: 'apple',
-    name: 'apples',
+    id: 'small_bread',
+    name: 'Small Bread',
+    unitCost: 4,
+  },
+  {
+    id: 'large_bread',
+    name: 'Large Bread',
     unitCost: 8,
   },
 ];
@@ -35,9 +40,6 @@ const initQty: Cart = {
 };
 products.map((el: Product) => el.id)
   .forEach((el:string) => initQty[el] = 0 ) 
-
-
-console.log(initQty)
 
 export default function Home() {
   const { data: session } = useSession();
