@@ -1,6 +1,7 @@
 
+import {ChangeEventHandler} from 'react'
 // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-export const Input: React.FC<{label: string, handleAdditionalCharge: Function}> = ( { label, handleAdditionalCharge }) => {
+export const Input:React.FC<{label:string, handleAdditionalCharge: ChangeEventHandler<HTMLInputElement> }> = ( { label, handleAdditionalCharge }) => {
     return (
         <div>
             <label className="block text-sm/6 font-medium text-3xl font-bold text-center mb-8 text-black">{label}</label>

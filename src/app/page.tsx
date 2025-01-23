@@ -1,22 +1,14 @@
 'use client'
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ChangeEvent } from 'react';
 import {Reader} from '@/components/reader';
 import { Input } from '@/components/input';
 import { processPayment, fetchReader, checkStatus } from '../../actions/stripe';
 import { StatusMessage, } from '@/components/statusMessage';
 import Header from '@/components/Header'
 import { useSession,  } from 'next-auth/react';
-
-interface Product {
-  id: string;
-  name: string;
-  unitCost: number;
-}
-
-interface Cart {
-  [key: string]: number; 
-  additionalCharges: number;
-}
+import {Reader as ReaderType
+} from '@stripe/terminal-js';
+import { Product, Cart, LogLevel} from './types';
 
 const products: Product[] = [
   {
@@ -36,6 +28,7 @@ const products: Product[] = [
   },
 ];
 
+
 // initialize a cart
 const initQty: Cart = {
   additionalCharges: 0
@@ -49,16 +42,16 @@ console.log(initQty)
 export default function Home() {
   const { data: session } = useSession();
   const [quantities, setQuantities] = useState<Cart>(initQty);
-  const [reader, setReader] = useState(null);
-  const [statusMsg, setStatusMsg] = useState({level:"info", message: ""});
-  const [paymentId, setPaymentId] = useState(null);
+  const [reader, setReader] = useState<ReaderType | null>(null);
+  const [statusMsg, setStatusMsg] = useState<{level:LogLevel, message:string}>({level:"info", message: ""});
+  const [paymentId, setPaymentId] = useState<string|undefined>(undefined);
   const [isProcessing, setIsProcessing] = useState(false);
 
   console.log(session)
   
   useEffect( () => {
     (async () => {
-      const readers = await fetchReader();
+      const readers: ReaderType[] = await fetchReader();
       setReader(readers[0]);
     })()
   } , [])
@@ -84,8 +77,12 @@ export default function Home() {
   };
 
   //
-  const handleAdditionalCharge = (e) => {
-    setQuantities({ ... quantities, additionalCharges:Number(e.target.value) })
+  const handleAdditionalCharge = (e: ChangeEvent<HTMLInputElement>) => {
+    const target = e.target as HTMLButtonElement;
+    setQuantities({ 
+      ... quantities,
+      additionalCharges:Number(target.value) 
+    })
   }
 
   // Handle checkout

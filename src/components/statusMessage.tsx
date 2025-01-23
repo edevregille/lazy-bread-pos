@@ -1,5 +1,5 @@
 
-type LogLevel = 'info' | 'warning' | 'error' | 'success';
+import { LogLevel} from '@/app/types';
 
 export const StatusMessage: React.FC<{text: string, level: LogLevel}> = ({ text, level }) => {
   const getLogLevelStyles = (level: LogLevel) => {
