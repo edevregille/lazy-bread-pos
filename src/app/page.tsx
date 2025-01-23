@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react';
-import Reader from '@/components/reader';
+import {Reader} from '@/components/reader';
 import { Input } from '@/components/input';
 import { processPayment, fetchReader, checkStatus } from '../../actions/stripe';
 import { StatusMessage, } from '@/components/statusMessage';
@@ -17,7 +17,6 @@ interface Cart {
   [key: string]: number; 
   additionalCharges: number;
 }
-
 
 const products: Product[] = [
   {

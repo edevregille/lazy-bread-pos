@@ -1,7 +1,7 @@
 
 type LogLevel = 'info' | 'warning' | 'error' | 'success';
 
-export const StatusMessage = ({ text, level }) => {
+export const StatusMessage: React.FC<{text: string, level: LogLevel}> = ({ text, level }) => {
   const getLogLevelStyles = (level: LogLevel) => {
     switch (level) {
       case 'info':

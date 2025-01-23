@@ -1,4 +1,5 @@
-export default function Reader({reader}) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const Reader: React.FC<any> = ({reader})  => {
     return (
         <>{
           reader && <div
