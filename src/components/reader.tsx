@@ -1,6 +1,3 @@
-import { useEffect , useState} from 'react';
-import { fetchReader,  } from '../../actions/stripe';
-
 export default function Reader({reader}) {
     return (
         <>{
