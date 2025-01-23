@@ -6,7 +6,7 @@ export interface Product {
   
 export interface Cart {
     [key: string]: number; 
-    additionalCharges: number;
+    // additionalCharges: number ;
 }
 
 export type LogLevel = 'info' | 'warning' | 'error' | 'success';

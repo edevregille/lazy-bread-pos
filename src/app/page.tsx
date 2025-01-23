@@ -33,10 +33,8 @@ const products: Product[] = [
   },
 ];
 
-
-// initialize a cart
 const initQty: Cart = {
-  additionalCharges: 0
+  // additionalCharges: undefined
 };
 products.map((el: Product) => el.id)
   .forEach((el:string) => initQty[el] = 0 ) 
@@ -75,7 +73,7 @@ export default function Home() {
       (total, product) => total + product.unitCost * quantities[product.id],
       0
     )
-    return total + quantities.additionalCharges;
+    return total + (quantities.additionalCharges ? quantities.additionalCharges : 0);
   };
 
   //
@@ -85,6 +83,11 @@ export default function Home() {
       ... quantities,
       additionalCharges:Number(target.value) 
     })
+  }
+
+  const handleReset = () => {
+    setQuantities(initQty);
+    if(isProcessing) setIsProcessing(false);
   }
 
   // Handle checkout
@@ -147,6 +150,7 @@ export default function Home() {
         <div className="bg-white p-6 rounded-lg shadow-md text-center">
             <Input 
               label={"Additional Charges"} 
+              value={quantities.additionalCharges}
               handleAdditionalCharge={handleAdditionalCharge}
             />
           </div>
@@ -155,13 +159,20 @@ export default function Home() {
 
         <div className="mt-8 text-center">
           <h3 className="text-2xl font-bold mb-4 text-black">Total Amount: ${calculateTotal()}</h3>
-          
-          {!isProcessing &&<button
-            onClick={handleCheckout}
-            className="bg-green-500 text-white py-2 px-6 rounded-lg shadow-md hover:bg-green-600"
+          <button
+            onClick={handleReset}
+            className="bg-red-500 text-white py-2 px-6 rounded-lg shadow-md hover:bg-red-600 m-4"
           >
-            Checkout
-          </button>}
+            Reset
+          </button>
+          {!isProcessing && <>
+            <button
+              onClick={handleCheckout}
+              className="bg-green-500 text-white py-2 px-6 rounded-lg shadow-md hover:bg-green-600"
+            >
+              Checkout
+            </button>
+          </>}
           {isProcessing && statusMsg.level !== "error" && <button
             onClick={checkPaymentStatus}
             className="bg-green-500 text-white py-2 px-6 rounded-lg shadow-md hover:bg-green-600"
