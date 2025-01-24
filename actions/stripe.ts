@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 
-const STRIPE_API_KEY =process.env["STRIPE_API_KEY"] || 'sk_test_51Qgf3NLAdquGgqLtscpfPNTwcOa4iiHVCOgb0aoFSgUKEya4ctryBCCmX1IUYN0UfSZuVqMMtgG3iurKDCa85NbG00KjWYZjQQ'
+const STRIPE_API_KEY =process.env["STRIPE_API_KEY"] || '';
 
 const stripe = new Stripe(STRIPE_API_KEY);
 
