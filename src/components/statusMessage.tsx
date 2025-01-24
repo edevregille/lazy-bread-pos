@@ -1,6 +1,6 @@
 
 import { LogLevel} from '@/app/types';
-
+//status
 export const StatusMessage: React.FC<{text: string, level: LogLevel}> = ({ text, level }) => {
   const getLogLevelStyles = (level: LogLevel) => {
     switch (level) {
