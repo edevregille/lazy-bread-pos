@@ -1,22 +1,27 @@
 import Stripe from 'stripe';
-const STRIPE_KEY: string = process.env.STRIPE_API_KEY || "sk_test_51Qgf3NLAdquGgqLtscpfPNTwcOa4iiHVCOgb0aoFSgUKEya4ctryBCCmX1IUYN0UfSZuVqMMtgG3iurKDCa85NbG00KjWYZjQQ";
-const stripe = new Stripe(STRIPE_KEY,{
-    typescript: true,
-});
+
+let _stripe: Stripe | null = null;
+
+const getStripe = (): Stripe => {
+  if (!_stripe) {
+    _stripe = new Stripe(process.env.STRIPE_API_KEY as string);
+  }
+  return _stripe;
+};
 
 export async function fetchReader () {
-    return (await stripe.terminal.readers.list())?.data;
+    return (await getStripe().terminal.readers.list())?.data;
 }
 
 export async function processPayment (amount: number, reader_id: string) {
     try {
-        const paymentIntent = await stripe.paymentIntents.create({
+        const paymentIntent = await getStripe().paymentIntents.create({
             currency: 'usd',
             payment_method_types: ['card_present'],
             capture_method: 'automatic',
             amount: amount*100,
         });
-        await stripe.terminal.readers.processPaymentIntent(
+        await getStripe().terminal.readers.processPaymentIntent(
             reader_id,
             {
               payment_intent: paymentIntent.id,
@@ -35,6 +40,6 @@ export async function processPayment (amount: number, reader_id: string) {
 
 
 export async function checkStatus(payment_intent_id: string) {
-    const paymentIntent = await stripe.paymentIntents.retrieve(payment_intent_id);
+    const paymentIntent = await getStripe().paymentIntents.retrieve(payment_intent_id);
     return { status: paymentIntent.status }
 }

@@ -10,28 +10,7 @@ import {Reader as ReaderType
 } from '@stripe/terminal-js';
 import { Product, Cart, LogLevel} from './types';
 
-const products: Product[] = [
-  {
-    id: 'small_soup',
-    name: 'Small Soup',
-    unitCost: 5,
-  },
-  {
-    id: 'large_soup',
-    name: 'Large Soup',
-    unitCost: 8,
-  },
-  {
-    id: 'small_bread',
-    name: 'Small Bread',
-    unitCost: 4,
-  },
-  {
-    id: 'large_bread',
-    name: 'Large Bread',
-    unitCost: 8,
-  },
-];
+import { products } from '@/config/config';
 
 const initQty: Cart = {
   // additionalCharges: undefined
@@ -46,8 +25,6 @@ export default function Home() {
   const [statusMsg, setStatusMsg] = useState<{level:LogLevel, message:string}>({level:"info", message: ""});
   const [paymentId, setPaymentId] = useState<string|undefined>(undefined);
   const [isProcessing, setIsProcessing] = useState(false);
-
-  console.log(session)
   
   useEffect( () => {
     (async () => {
