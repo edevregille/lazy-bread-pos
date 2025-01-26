@@ -3,14 +3,13 @@
 import { useState, useEffect, ChangeEvent } from "react";
 import { Reader } from "@/components/reader";
 import { Input } from "@/components/input";
-import { processPayment, fetchReader, checkStatus } from "../actions/stripe";
 import { StatusMessage } from "@/components/statusMessage";
 import Header from "@/components/Header";
 import { useSession } from "next-auth/react";
 import { Reader as ReaderType } from "@stripe/terminal-js";
 import { Product, Cart, LogLevel } from "./types";
 import { products } from "@/config/config";
-import { calculateCartTotal, isValidEmail } from "@/lib/utils";
+import { calculateCartTotal, isValidEmail, fetchReaders, pay, retrievePaymentStatus } from "@/lib/utils";
 import Receipt from "@/components/receipt";
 
 const initQty: Cart = {
@@ -33,7 +32,7 @@ export default function Home() {
 
   useEffect(() => {
     (async () => {
-      const readers: ReaderType[] = await fetchReader();
+      const readers: ReaderType[] = (await fetchReaders()).readers;
       setReader(readers[0]);
     })();
   }, []);
@@ -85,14 +84,14 @@ export default function Home() {
     setIsProcessing(true);
     setIsModalReceiptOpen(false);
     if (reader && reader.id) {
-      const resp = await processPayment(
+      const resp = await pay(
         cart,
         email && isValidEmail(email) ? email : null,
         reader.id,
       );
       if (resp.error) setStatusMsg({ level: "error", message: resp.message });
       else {
-        setPaymentId(resp.payment_intent);
+        setPaymentId(resp.id);
         setStatusMsg({
           level: "info",
           message: "payment processing - check terminal",
@@ -103,7 +102,7 @@ export default function Home() {
 
   const checkPaymentStatus = async () => {
     if (paymentId) {
-      const response = await checkStatus(paymentId);
+      const response = await retrievePaymentStatus(paymentId);
       setStatusMsg({
         level: response.status === "succeeded" ? "success" : "info",
         message: response.status,
@@ -116,6 +115,8 @@ export default function Home() {
       <Header />
       {session && (
         <>
+          <Reader reader={reader} />
+          <br/><br/>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-8">
             {products.map((product) => (
               <div
@@ -203,7 +204,6 @@ export default function Home() {
             )}
           </div>
           <br />
-          <Reader reader={reader} />
         </>
       )}
     </div>
