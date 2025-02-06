@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 
 import Stripe from "stripe";
-
-
 let _stripe: Stripe | null = null;
 
 const getStripe = (): Stripe => {

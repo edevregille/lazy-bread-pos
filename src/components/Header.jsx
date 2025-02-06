@@ -6,6 +6,7 @@ export default function Header() {
   const { data: session } = useSession();
 
   const handleGoogleLogin = () => {
+    console.log("signin", session)
     if (session) signOut();
     else signIn("google");
   };
