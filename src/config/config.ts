@@ -14,7 +14,7 @@ export const products: Product[] = [
   {
     id: "bread",
     name: "Foccacia Bread",
-    unitCost: 5,
+    unitCost: 6,
   },
   {
     id: "meal_for_two",
