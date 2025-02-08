@@ -18,11 +18,11 @@ export const products: Product[] = [
   },
   {
     id: "meal_for_two",
-    name: "Meal For 2",
-    unitCost: 16,
+    name: "Meal For 2 (1 soup + 1 bread)",
+    unitCost: 17,
   },{
     id: "meal_for_four",
-    name: "Meal For 4",
-    unitCost: 25,
+    name: "Meal For 4 (2 soup + 1 bread)",
+    unitCost: 28,
   },
 ];
