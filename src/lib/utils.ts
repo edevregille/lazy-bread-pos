@@ -16,10 +16,15 @@ export const isValidEmail = (email: string): boolean => {
 
 
 export const fetchReaders = async () => {
+    try {
     const response = await fetch('/api/readers', {
         method:'GET'
     });
     return await response.json();
+} catch (error) {
+    console.error('Error fetching readers:', error);
+    return [];
+}
 }
 
 

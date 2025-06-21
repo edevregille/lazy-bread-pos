@@ -3,12 +3,23 @@ import { Product } from "@/app/types";
 export const products: Product[] = [
   {
     id: "nature_bread",
-    name: "Nature Foccacia",
+    name: "Rosemary / Classic",
     unitCost: 6,
   },
   {
     id: "flavored_bread",
-    name: "Flavored Foccacia",
+    name: "Aditions / Flavored Breads",
     unitCost: 8,
-  }
+  },
+  {
+    id: "special_bread",
+    name: "Special",
+    unitCost: 10,
+  },
+  {
+    id: "friend_discount",
+    name: "Friend Discount",
+    unitCost: 5,
+  },
+  
 ];

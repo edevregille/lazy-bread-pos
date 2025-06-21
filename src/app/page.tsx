@@ -32,10 +32,12 @@ export default function Home() {
 
   useEffect(() => {
     (async () => {
-      const readers: ReaderType[] = (await fetchReaders()).readers;
-      setReader(readers[0]);
+      if(session) {
+        const readers: ReaderType[] = (await fetchReaders()).readers;
+        setReader(readers[0]);
+      }
     })();
-  }, []);
+  }, [session]);
 
   // Function to handle quantity change
   const handleQuantityChange = (
