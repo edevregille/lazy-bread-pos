@@ -153,7 +153,7 @@ export default function OrdersList() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center p-8">
+      <div className="flex justify-center items-center p-4 sm:p-8">
         <div className="text-lg text-gray-600">Loading orders...</div>
       </div>
     );
@@ -161,7 +161,7 @@ export default function OrdersList() {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center p-8">
+      <div className="flex flex-col items-center p-4 sm:p-8">
         <div className="text-lg text-red-600 mb-4">{error}</div>
         <button
           onClick={fetchOrders}
@@ -175,16 +175,16 @@ export default function OrdersList() {
 
   if (orders.length === 0) {
     return (
-      <div className="flex justify-center items-center p-8">
+      <div className="flex justify-center items-center p-4 sm:p-8">
         <div className="text-lg text-gray-600">No orders found</div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full">
-      {/* Left Sidebar - Delivery Date Navigation */}
-      <div className="w-64 bg-white rounded-lg shadow-md mr-6 p-4">
+    <div className="flex flex-col lg:flex-row h-full gap-4 lg:gap-6">
+      {/* Delivery Date Navigation - Mobile: Horizontal scroll, Desktop: Sidebar */}
+      <div className="lg:w-64 bg-white rounded-lg shadow-md p-4 order-1 lg:order-1">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-black">Delivery Dates</h3>
           <button
@@ -195,7 +195,30 @@ export default function OrdersList() {
           </button>
         </div>
         
-        <div className="space-y-2">
+        {/* Mobile: Horizontal scrollable list */}
+        <div className="lg:hidden overflow-x-auto pb-2">
+          <div className="flex space-x-2 min-w-max">
+            {deliveryDateGroups.map((group) => (
+              <button
+                key={group.date}
+                onClick={() => setSelectedDeliveryDate(group.date)}
+                className={`flex-shrink-0 p-3 rounded-lg transition-colors whitespace-nowrap ${
+                  selectedDeliveryDate === group.date
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <div className="font-medium">{formatShortDate(group.date)}</div>
+                <div className="text-xs opacity-75">
+                  {group.totalOrders} orders • {getTotalBreadCount(group.breadSummary)} bread
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Desktop: Vertical list */}
+        <div className="hidden lg:block space-y-2">
           {deliveryDateGroups.map((group) => (
             <button
               key={group.date}
@@ -216,28 +239,28 @@ export default function OrdersList() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1">
+      <div className="flex-1 order-2 lg:order-2">
         {selectedGroup && (
-          <div className="space-y-6">
+          <div className="space-y-4 lg:space-y-6">
             {/* Header */}
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h2 className="text-2xl font-bold text-black mb-2">
+            <div className="bg-white p-4 lg:p-6 rounded-lg shadow-md">
+              <h2 className="text-xl lg:text-2xl font-bold text-black mb-2">
                 {formatDate(selectedGroup.date)}
               </h2>
-              <p className="text-gray-600">
+              <p className="text-sm lg:text-base text-gray-600">
                 {selectedGroup.totalOrders} orders • {getTotalBreadCount(selectedGroup.breadSummary)} bread • {formatCurrency(selectedGroup.totalRevenue)} total revenue
               </p>
             </div>
 
             {/* Summary Statistics */}
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-semibold text-black mb-4">Bread Summary</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="bg-white p-4 lg:p-6 rounded-lg shadow-md">
+              <h3 className="text-lg lg:text-xl font-semibold text-black mb-4">Bread Summary</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
                 {Object.entries(selectedGroup.breadSummary).map(([breadName, quantity]) => (
-                  <div key={breadName} className="bg-gray-50 p-4 rounded-lg">
-                    <div className="font-medium text-black">{breadName}</div>
-                    <div className="text-2xl font-bold text-blue-600">{quantity}</div>
-                    <div className="text-sm text-gray-500">units ordered</div>
+                  <div key={breadName} className="bg-gray-50 p-3 lg:p-4 rounded-lg">
+                    <div className="font-medium text-black text-sm lg:text-base">{breadName}</div>
+                    <div className="text-xl lg:text-2xl font-bold text-blue-600">{quantity}</div>
+                    <div className="text-xs lg:text-sm text-gray-500">units ordered</div>
                   </div>
                 ))}
               </div>
@@ -247,41 +270,43 @@ export default function OrdersList() {
             <DeliveryMap orders={selectedGroup.orders} deliveryDate={selectedGroup.date} />
 
             {/* Orders List */}
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-semibold text-black mb-4">
+            <div className="bg-white p-4 lg:p-6 rounded-lg shadow-md">
+              <h3 className="text-lg lg:text-xl font-semibold text-black mb-4">
                 Orders ({selectedGroup.orders.length})
               </h3>
               
-              <div className="space-y-4">
+              <div className="space-y-3 lg:space-y-4">
                 {selectedGroup.orders.map((order) => (
                   <div
                     key={order.id}
-                    className="border border-gray-200 p-4 rounded-lg hover:bg-gray-50"
+                    className="border border-gray-200 p-3 lg:p-4 rounded-lg hover:bg-gray-50"
                   >
-                    <div className="flex justify-between items-start mb-3">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3">
                       <div className="flex-1">
-                        <h4 className="text-lg font-semibold text-black">
+                        <h4 className="text-base lg:text-lg font-semibold text-black">
                           Order #{order.id}
                         </h4>
-                        <p className="text-sm text-gray-500">
-                          {order.customer_name || 'No name provided'}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {order.customer_email || 'No email provided'}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {order.customer_phone || 'No phone provided'}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {new Date(order.created_at).toLocaleString()}
-                        </p>
+                        <div className="space-y-1 mt-1">
+                          <p className="text-xs lg:text-sm text-gray-500">
+                            {order.customer_name || 'No name provided'}
+                          </p>
+                          <p className="text-xs lg:text-sm text-gray-500">
+                            {order.customer_email || 'No email provided'}
+                          </p>
+                          <p className="text-xs lg:text-sm text-gray-500">
+                            {order.customer_phone || 'No phone provided'}
+                          </p>
+                          <p className="text-xs lg:text-sm text-gray-500">
+                            {new Date(order.created_at).toLocaleString()}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right ml-4">
-                        <p className="text-xl font-bold text-black">
+                      <div className="text-left sm:text-right">
+                        <p className="text-lg lg:text-xl font-bold text-black">
                           {formatCurrency(order.total_amount)}
                         </p>
                         {order.payment_status && (
-                          <span className={`inline-block px-2 py-1 text-xs rounded-full ${
+                          <span className={`inline-block px-2 py-1 text-xs rounded-full mt-1 ${
                             order.payment_status === 'succeeded' 
                               ? 'bg-green-100 text-green-800' 
                               : 'bg-yellow-100 text-yellow-800'
@@ -295,8 +320,8 @@ export default function OrdersList() {
                     {/* Delivery Address */}
                     {(order.delivery_address || order.delivery_city || order.delivery_zip_code) && (
                       <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-                        <h5 className="text-sm font-medium text-gray-700 mb-1">Delivery Address:</h5>
-                        <div className="text-sm text-gray-600">
+                        <h5 className="text-xs lg:text-sm font-medium text-gray-700 mb-1">Delivery Address:</h5>
+                        <div className="text-xs lg:text-sm text-gray-600">
                           {order.delivery_address && <p>{order.delivery_address}</p>}
                           {(order.delivery_city || order.delivery_zip_code) && (
                             <p>
@@ -309,9 +334,9 @@ export default function OrdersList() {
                       </div>
                     )}
                     
-                    <div className="space-y-2">
+                    <div className="space-y-1 lg:space-y-2">
                       {(order.items || order.order_items || []).map((item: OrderItem, index) => (
-                        <div key={index} className="flex justify-between text-sm">
+                        <div key={index} className="flex justify-between text-xs lg:text-sm">
                           <span className="text-gray-700">
                             {item.name} x{item.quantity}
                           </span>
@@ -322,7 +347,7 @@ export default function OrdersList() {
                       ))}
                       
                       {order.additional_charges && order.additional_charges > 0 && (
-                        <div className="flex justify-between text-sm border-t pt-2">
+                        <div className="flex justify-between text-xs lg:text-sm border-t pt-2">
                           <span className="text-gray-700">Additional Charges</span>
                           <span className="text-gray-600">
                             {formatCurrency(order.additional_charges)}

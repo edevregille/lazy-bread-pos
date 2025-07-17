@@ -163,16 +163,16 @@ export default function Home() {
   };
 
   return (
-    <div className="font-sans bg-gray-100 min-h-screen p-6">
+    <div className="font-sans bg-gray-100 min-h-screen p-3 sm:p-6">
       <Header />
       {session && (
         <>
           {/* Tab Navigation */}
-          <div className="mb-6">
+          <div className="mb-4 sm:mb-6">
             <div className="flex space-x-1 bg-white p-1 rounded-lg shadow-sm">
               <button
                 onClick={() => setActiveTab('pos')}
-                className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
+                className={`flex-1 py-2 px-2 sm:px-4 rounded-md font-medium transition-colors text-sm sm:text-base ${
                   activeTab === 'pos'
                     ? 'bg-blue-500 text-white'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
@@ -182,7 +182,7 @@ export default function Home() {
               </button>
               <button
                 onClick={() => setActiveTab('orders')}
-                className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
+                className={`flex-1 py-2 px-2 sm:px-4 rounded-md font-medium transition-colors text-sm sm:text-base ${
                   activeTab === 'orders'
                     ? 'bg-blue-500 text-white'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
@@ -198,34 +198,34 @@ export default function Home() {
             <>
               <Reader reader={reader} />
               <br/><br/>
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
             {products.map((product) => (
               <div
                 key={product.id}
-                className="bg-white p-6 rounded-lg shadow-md text-center"
+                className="bg-white p-4 sm:p-6 rounded-lg shadow-md text-center"
               >
-                <h2 className="text-xl font-semibold mb-4 text-black">
+                <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-black">
                   {product.name}
                 </h2>
-                <p className="text-gray-500 mb-4">
+                <p className="text-sm sm:text-base text-gray-500 mb-3 sm:mb-4">
                   Unit Cost: ${product.unitCost}
                 </p>
 
-                <div className="flex justify-center items-center gap-4 mb-6">
+                <div className="flex justify-center items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
                   <button
                     onClick={() =>
                       handleQuantityChange(product.id, "decrement")
                     }
-                    className="bg-gray-300 text-lg p-2 rounded-full hover:bg-gray-400 text-black"
+                    className="bg-gray-300 text-base sm:text-lg p-2 rounded-full hover:bg-gray-400 text-black min-w-[40px] min-h-[40px] flex items-center justify-center"
                   >
                     -
                   </button>
-                  <span className="text-xl text-black">{cart[product.id]}</span>
+                  <span className="text-lg sm:text-xl text-black min-w-[30px]">{cart[product.id]}</span>
                   <button
                     onClick={() =>
                       handleQuantityChange(product.id, "increment")
                     }
-                    className="bg-gray-300 text-lg p-2 rounded-full hover:bg-gray-400 text-black"
+                    className="bg-gray-300 text-base sm:text-lg p-2 rounded-full hover:bg-gray-400 text-black min-w-[40px] min-h-[40px] flex items-center justify-center"
                   >
                     +
                   </button>
@@ -237,8 +237,8 @@ export default function Home() {
             <Receipt processFinalPayment={processFinalPayment} />
           )}
           <br />
-          <div className="grid grid-cols-1 sm:grid-cols-1 gap-8">
-            <div className="bg-white p-6 rounded-lg shadow-md text-center">
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:gap-8">
+            <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md text-center">
               <Input
                 label={"Additional Charges"}
                 value={cart.additionalCharges}
@@ -247,34 +247,34 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mt-8 text-center">
-            <h3 className="text-2xl font-bold mb-4 text-black">
+          <div className="mt-6 sm:mt-8 text-center">
+            <h3 className="text-xl sm:text-2xl font-bold mb-4 text-black">
               Total Amount: ${calculateCartTotal(products, cart)}
             </h3>
-            <button
-              onClick={handleReset}
-              className="bg-red-500 text-white py-2 px-6 rounded-lg shadow-md hover:bg-red-600 m-4"
-            >
-              Reset
-            </button>
-            {!isProcessing && (
-              <>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
+              <button
+                onClick={handleReset}
+                className="bg-red-500 text-white py-2 px-4 sm:px-6 rounded-lg shadow-md hover:bg-red-600 w-full sm:w-auto"
+              >
+                Reset
+              </button>
+              {!isProcessing && (
                 <button
                   onClick={handleCheckout}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 w-full sm:w-auto"
                 >
                   Checkout
                 </button>
-              </>
-            )}
-            {isProcessing && statusMsg.level !== "error" && (
-              <button
-                onClick={checkPaymentStatus}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-              >
-                Check Payment Status
-              </button>
-            )}
+              )}
+              {isProcessing && statusMsg.level !== "error" && (
+                <button
+                  onClick={checkPaymentStatus}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 w-full sm:w-auto"
+                >
+                  Check Payment Status
+                </button>
+              )}
+            </div>
             <br />
             <br />
             {isProcessing && (

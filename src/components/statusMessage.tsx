@@ -21,13 +21,13 @@ export const StatusMessage: React.FC<{ text: string; level: LogLevel }> = ({
 
   return (
     <div
-      className={`max-w-xs p-4 rounded-lg shadow-md transition-all ${getLogLevelStyles(level)}`}
+      className={`w-full max-w-xs p-3 sm:p-4 rounded-lg shadow-md transition-all ${getLogLevelStyles(level)}`}
     >
       <div className="flex items-center mb-2">
         <div
           className={`w-3 h-3 rounded-full mr-2 ${level === "info" ? "bg-blue-600" : level === "warning" ? "bg-yellow-600" : level === "error" ? "bg-red-600" : "bg-green-600"}`}
         />
-        <p className="font-medium">{text}</p>
+        <p className="font-medium text-sm sm:text-base">{text}</p>
       </div>
     </div>
   );

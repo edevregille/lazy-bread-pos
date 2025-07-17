@@ -283,14 +283,14 @@ export default function DeliveryMap({ orders, deliveryDate }: DeliveryMapProps) 
           // Create info window
           const infoWindow = new window.google.maps.InfoWindow({
             content: `
-              <div style="padding: 8px; max-width: 200px;">
-                <h3 style="margin: 0 0 4px 0; font-size: 14px; font-weight: bold;">
+              <div style="padding: 12px; max-width: 250px; min-width: 200px;">
+                <h3 style="margin: 0 0 6px 0; font-size: 16px; font-weight: bold; color: #1f2937;">
                   ${order.customer_name || 'Customer'}
                 </h3>
-                <p style="margin: 0; font-size: 12px; color: #666;">
+                <p style="margin: 0 0 4px 0; font-size: 13px; color: #4b5563; line-height: 1.4;">
                   ${address}
                 </p>
-                <p style="margin: 4px 0 0 0; font-size: 11px; color: #999;">
+                <p style="margin: 0; font-size: 12px; color: #6b7280; font-weight: 500;">
                   Order #${order.id}
                 </p>
               </div>
@@ -328,9 +328,9 @@ export default function DeliveryMap({ orders, deliveryDate }: DeliveryMapProps) 
 
   if (loading) {
     return (
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h3 className="text-xl font-semibold text-black mb-4">Delivery Map</h3>
-        <div className="flex justify-center items-center h-64 bg-gray-100 rounded-lg">
+      <div className="bg-white p-4 lg:p-6 rounded-lg shadow-md">
+        <h3 className="text-lg lg:text-xl font-semibold text-black mb-4">Delivery Map</h3>
+        <div className="flex justify-center items-center h-48 sm:h-64 bg-gray-100 rounded-lg">
           <div className="text-gray-600">Loading map...</div>
         </div>
       </div>
@@ -339,13 +339,13 @@ export default function DeliveryMap({ orders, deliveryDate }: DeliveryMapProps) 
 
   if (error) {
     return (
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h3 className="text-xl font-semibold text-black mb-4">Delivery Map</h3>
-        <div className="flex justify-center items-center h-64 bg-gray-100 rounded-lg">
+      <div className="bg-white p-4 lg:p-6 rounded-lg shadow-md">
+        <h3 className="text-lg lg:text-xl font-semibold text-black mb-4">Delivery Map</h3>
+        <div className="flex justify-center items-center h-48 sm:h-64 bg-gray-100 rounded-lg">
           <div className="text-red-600 text-center">
             <div className="mb-2">⚠️</div>
-            <div>{error}</div>
-            <div className="text-sm text-gray-500 mt-2">
+            <div className="text-sm lg:text-base">{error}</div>
+            <div className="text-xs lg:text-sm text-gray-500 mt-2">
               Please check your Google Maps API key configuration
             </div>
           </div>
@@ -356,14 +356,14 @@ export default function DeliveryMap({ orders, deliveryDate }: DeliveryMapProps) 
 
   if (ordersWithAddress.length === 0) {
     return (
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h3 className="text-xl font-semibold text-black mb-4">Delivery Map</h3>
-        <div className="flex justify-center items-center h-64 bg-gray-100 rounded-lg">
+      <div className="bg-white p-4 lg:p-6 rounded-lg shadow-md">
+        <h3 className="text-lg lg:text-xl font-semibold text-black mb-4">Delivery Map</h3>
+        <div className="flex justify-center items-center h-48 sm:h-64 bg-gray-100 rounded-lg">
           <div className="text-gray-600 text-center">
             <div className="mb-2">📍</div>
-            <div>No delivery addresses available</div>
-            <div className="text-sm text-gray-500 mt-2">
-                             Orders for this date don&apos;t have complete address information
+            <div className="text-sm lg:text-base">No delivery addresses available</div>
+            <div className="text-xs lg:text-sm text-gray-500 mt-2">
+              Orders for this date don&apos;t have complete address information
             </div>
           </div>
         </div>
@@ -372,17 +372,17 @@ export default function DeliveryMap({ orders, deliveryDate }: DeliveryMapProps) 
   }
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h3 className="text-xl font-semibold text-black mb-4">
+    <div className="bg-white p-4 lg:p-6 rounded-lg shadow-md">
+      <h3 className="text-lg lg:text-xl font-semibold text-black mb-4">
         Delivery Map ({ordersWithAddress.length} locations)
       </h3>
       <div 
         ref={mapRef} 
-        className="w-full h-96 rounded-lg border border-gray-200"
-        style={{ minHeight: '400px' }}
+        className="w-full h-64 sm:h-80 lg:h-96 rounded-lg border border-gray-200"
+        style={{ minHeight: '250px' }}
       />
-      <div className="mt-4 text-sm text-gray-600">
-        <p>• Click on markers to see customer details</p>
+      <div className="mt-3 lg:mt-4 text-xs lg:text-sm text-gray-600 space-y-1">
+        <p>• Tap on markers to see customer details</p>
         <p>• Map shows all delivery locations for {new Date(deliveryDate).toLocaleDateString()}</p>
       </div>
     </div>

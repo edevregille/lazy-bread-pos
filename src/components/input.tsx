@@ -7,7 +7,7 @@ export const Input: React.FC<{
 }> = ({ label, value, handleAdditionalCharge }) => {
   return (
     <div>
-      <label className="block text-sm/6 font-medium text-3xl font-bold text-center mb-8 text-black">
+      <label className="block text-sm/6 font-medium text-xl sm:text-3xl font-bold text-center mb-4 sm:mb-8 text-black">
         {label}
       </label>
       <div className="mt-2">
