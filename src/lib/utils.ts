@@ -20,10 +20,24 @@ export const fetchReaders = async () => {
     const response = await fetch('/api/readers', {
         method:'GET'
     });
-    return await response.json();
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return {
+      success: true,
+      readers: data.readers || [],
+      error: null
+    };
 } catch (error) {
     console.error('Error fetching readers:', error);
-    return [];
+    return {
+      success: false,
+      readers: [],
+      error: error instanceof Error ? error.message : 'Failed to fetch readers'
+    };
 }
 }
 

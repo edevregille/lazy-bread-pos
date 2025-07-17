@@ -5,6 +5,7 @@ import { Reader } from "@/components/reader";
 import { Input } from "@/components/input";
 import { StatusMessage } from "@/components/statusMessage";
 import Header from "@/components/Header";
+import OrdersList from "@/components/OrdersList";
 import { useSession } from "next-auth/react";
 import { Reader as ReaderType } from "@stripe/terminal-js";
 import { Product, Cart, LogLevel } from "./types";
@@ -20,6 +21,7 @@ products.map((el: Product) => el.id).forEach((el: string) => (initQty[el] = 0));
 
 export default function Home() {
   const { data: session } = useSession();
+  const [activeTab, setActiveTab] = useState<'pos' | 'orders'>('pos');
   const [cart, setCart] = useState<Cart>(initQty);
   const [reader, setReader] = useState<ReaderType | null>(null);
   const [statusMsg, setStatusMsg] = useState<{
@@ -33,8 +35,20 @@ export default function Home() {
   useEffect(() => {
     (async () => {
       if(session) {
-        const readers: ReaderType[] = (await fetchReaders()).readers;
-        setReader(readers[0]);
+        const result = await fetchReaders();
+        if (result.success && result.readers.length > 0) {
+          setReader(result.readers[0]);
+        } else if (!result.success) {
+          setStatusMsg({
+            level: "error",
+            message: `Failed to connect to Stripe Terminal: ${result.error}`,
+          });
+        } else {
+          setStatusMsg({
+            level: "error",
+            message: "No Stripe Terminal readers found. Please check your terminal connection.",
+          });
+        }
       }
     })();
   }, [session]);
@@ -70,35 +84,71 @@ export default function Home() {
   // Handle checkout
   const handleCheckout = async () => {
     const totalAmount = calculateCartTotal(products, cart);
-    if (totalAmount > 0.5 && reader && reader.status === "online") {
-      setIsModalReceiptOpen(true);
-    } else {
+    
+    if (totalAmount <= 0.5) {
       setStatusMsg({
         level: "error",
-        message:
-          "The reader needs to be online and the amount should be > $0.5",
+        message: "Total amount must be greater than $0.50",
       });
+      return;
     }
+    
+    if (!reader) {
+      setStatusMsg({
+        level: "error",
+        message: "No Stripe Terminal reader available. Please check your terminal connection.",
+      });
+      return;
+    }
+    
+    if (reader.status !== "online") {
+      setStatusMsg({
+        level: "error",
+        message: `Stripe Terminal reader is ${reader.status}. Please ensure the reader is connected and online.`,
+      });
+      return;
+    }
+    
+    setIsModalReceiptOpen(true);
   };
 
   // process payment
   const processFinalPayment = async (email: string | null) => {
     setIsProcessing(true);
     setIsModalReceiptOpen(false);
-    if (reader && reader.id) {
+    
+    if (!reader || !reader.id) {
+      setStatusMsg({ 
+        level: "error", 
+        message: "No Stripe Terminal reader available. Please check your terminal connection." 
+      });
+      setIsProcessing(false);
+      return;
+    }
+    
+    try {
       const resp = await pay(
         cart,
         email && isValidEmail(email) ? email : null,
         reader.id,
       );
-      if (resp.error) setStatusMsg({ level: "error", message: resp.message });
-      else {
+      
+      if (resp.error) {
+        setStatusMsg({ level: "error", message: resp.message });
+      } else {
         setPaymentId(resp.id);
         setStatusMsg({
           level: "info",
-          message: "payment processing - check terminal",
+          message: "Payment processing - check terminal",
         });
       }
+    } catch {
+      setStatusMsg({ 
+        level: "error", 
+        message: "Failed to process payment. Please try again." 
+      });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -117,8 +167,37 @@ export default function Home() {
       <Header />
       {session && (
         <>
-          <Reader reader={reader} />
-          <br/><br/>
+          {/* Tab Navigation */}
+          <div className="mb-6">
+            <div className="flex space-x-1 bg-white p-1 rounded-lg shadow-sm">
+              <button
+                onClick={() => setActiveTab('pos')}
+                className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
+                  activeTab === 'pos'
+                    ? 'bg-blue-500 text-white'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                Point of Sale
+              </button>
+              <button
+                onClick={() => setActiveTab('orders')}
+                className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors ${
+                  activeTab === 'orders'
+                    ? 'bg-blue-500 text-white'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                Online Orders
+              </button>
+            </div>
+          </div>
+
+          {/* POS Tab Content */}
+          {activeTab === 'pos' && (
+            <>
+              <Reader reader={reader} />
+              <br/><br/>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-8">
             {products.map((product) => (
               <div
@@ -206,6 +285,13 @@ export default function Home() {
             )}
           </div>
           <br />
+            </>
+          )}
+
+          {/* Orders Tab Content */}
+          {activeTab === 'orders' && (
+            <OrdersList />
+          )}
         </>
       )}
     </div>
