@@ -4,10 +4,10 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 
 interface Order {
   id: string;
-  customer_name?: string;
-  delivery_address?: string;
-  delivery_city?: string;
-  delivery_zip_code?: string;
+  customerName?: string;
+  address?: string;
+  city?: string;
+  zipCode?: string;
 }
 
 interface DeliveryMapProps {
@@ -135,7 +135,7 @@ export default function DeliveryMap({ orders, deliveryDate }: DeliveryMapProps) 
 
   // Filter orders that have address information - memoized to prevent infinite loops
   const ordersWithAddress = useMemo(() => 
-    orders.filter(order => order.delivery_address),
+    orders.filter(order => order.address),
     [orders]
   );
 
@@ -254,7 +254,7 @@ export default function DeliveryMap({ orders, deliveryDate }: DeliveryMapProps) 
     let geocodedCount = 0;
 
     ordersWithAddress.forEach((order, index) => {
-      const address = `${order.delivery_address}, ${order.delivery_city}, ${order.delivery_zip_code}`;
+      const address = `${order.address}, ${order.city}, ${order.zipCode}`;
       
       geocoder.geocode({ address }, (results: GoogleGeocoderResult[], status: string) => {
         if (status === 'OK' && results[0]) {
@@ -264,7 +264,7 @@ export default function DeliveryMap({ orders, deliveryDate }: DeliveryMapProps) 
           const marker = new window.google.maps.Marker({
             position: location,
             map: map,
-            title: `${order.customer_name || 'Customer'} - ${address}`,
+            title: `${order.customerName || 'Customer'} - ${address}`,
             label: {
               text: (index + 1).toString(),
               color: 'white',
@@ -285,7 +285,7 @@ export default function DeliveryMap({ orders, deliveryDate }: DeliveryMapProps) 
             content: `
               <div style="padding: 12px; max-width: 250px; min-width: 200px;">
                 <h3 style="margin: 0 0 6px 0; font-size: 16px; font-weight: bold; color: #1f2937;">
-                  ${order.customer_name || 'Customer'}
+                  ${order.customerName || 'Customer'}
                 </h3>
                 <p style="margin: 0 0 4px 0; font-size: 13px; color: #4b5563; line-height: 1.4;">
                   ${address}

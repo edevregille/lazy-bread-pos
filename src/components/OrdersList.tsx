@@ -12,21 +12,19 @@ type OrderItem = {
 
 interface Order {
   id: string;
-  customer_email?: string;
-  customer_name?: string;
-  customer_phone?: string;
-  delivery_address?: string;
-  delivery_city?: string;
-  delivery_zip_code?: string;
-  total_amount: number;
+  email?: string;
+  customerName?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  zipCode?: string;
+  totalAmount: number;
   items?: OrderItem[];
   order_items?: OrderItem[];
   additional_charges?: number;
-  created_at: string;
-  payment_status?: string;
-  s3_key?: string;
-  s3_last_modified?: string;
-  delivery_date?: string;
+  createdAt: string;
+  status?: string;
+  deliveryDate?: string;
 }
 
 interface OrdersResponse {
@@ -73,6 +71,12 @@ export default function OrdersList() {
       const data: OrdersResponse = await response.json();
       
       if (data.success) {
+        console.log('Orders data received:', data.orders);
+        // Log a sample order to see the date format
+        if (data.orders.length > 0) {
+          console.log('Sample order created_at:', data.orders[0].createdAt);
+          console.log('Sample order delivery_date:', data.orders[0].deliveryDate);
+        }
         setOrders(data.orders);
       } else {
         setError('Failed to fetch orders');
@@ -89,10 +93,29 @@ export default function OrdersList() {
     const groups: { [key: string]: DeliveryDateSummary } = {};
 
     orders.forEach(order => {
+      // Helper function to safely parse dates
+      const parseDate = (dateString: string | undefined): string => {
+        if (!dateString) {
+          // If no date provided, use today's date
+          return new Date().toISOString().split('T')[0];
+        }
+        
+        try {
+          const date = new Date(dateString);
+          // Check if the date is valid
+          if (isNaN(date.getTime())) {
+            console.warn(`Invalid date format: ${dateString}, using today's date`);
+            return new Date().toISOString().split('T')[0];
+          }
+          return date.toISOString().split('T')[0];
+        } catch (error) {
+          console.warn(`Error parsing date: ${dateString}, using today's date`, error);
+          return new Date().toISOString().split('T')[0];
+        }
+      };
+
       // Use delivery_date if available, otherwise use created_at date
-      const deliveryDate = order.delivery_date 
-        ? new Date(order.delivery_date).toISOString().split('T')[0]
-        : new Date(order.created_at).toISOString().split('T')[0];
+      const deliveryDate = parseDate(order.deliveryDate || order.createdAt);
 
       if (!groups[deliveryDate]) {
         groups[deliveryDate] = {
@@ -105,7 +128,7 @@ export default function OrdersList() {
       }
 
       groups[deliveryDate].totalOrders++;
-      groups[deliveryDate].totalRevenue += order.total_amount;
+      groups[deliveryDate].totalRevenue += order.totalAmount;
       groups[deliveryDate].orders.push(order);
 
       // Aggregate bread quantities
@@ -123,19 +146,37 @@ export default function OrdersList() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      return date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.warn(`Error formatting date: ${dateString}`, error);
+      return 'Invalid Date';
+    }
   };
 
   const formatShortDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
-    });
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.warn(`Error formatting short date: ${dateString}`, error);
+      return 'Invalid Date';
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -288,46 +329,57 @@ export default function OrdersList() {
                         </h4>
                         <div className="space-y-1 mt-1">
                           <p className="text-xs lg:text-sm text-gray-500">
-                            {order.customer_name || 'No name provided'}
+                            {order.customerName || 'No name provided'}
                           </p>
                           <p className="text-xs lg:text-sm text-gray-500">
-                            {order.customer_email || 'No email provided'}
+                            {order.email || 'No email provided'}
                           </p>
                           <p className="text-xs lg:text-sm text-gray-500">
-                            {order.customer_phone || 'No phone provided'}
+                            {order.phone || 'No phone provided'}
                           </p>
                           <p className="text-xs lg:text-sm text-gray-500">
-                            {new Date(order.created_at).toLocaleString()}
+                            {(() => {
+                              try {
+                                const date = new Date(order.createdAt);
+                                if (isNaN(date.getTime())) {
+                                  return 'Invalid Date';
+                                }
+                                return date.toLocaleString();
+                              } catch (error) {
+                                console.warn(`Error formatting created_at: ${order.createdAt}`, error);
+                                return 'Invalid Date';
+                              }
+                            })()}
                           </p>
                         </div>
                       </div>
                       <div className="text-left sm:text-right">
                         <p className="text-lg lg:text-xl font-bold text-black">
-                          {formatCurrency(order.total_amount)}
+                          {formatCurrency(order.totalAmount)}
                         </p>
-                        {order.payment_status && (
+                        {order.status && (
                           <span className={`inline-block px-2 py-1 text-xs rounded-full mt-1 ${
-                            order.payment_status === 'succeeded' 
+                            order.status === 'succeeded' 
                               ? 'bg-green-100 text-green-800' 
                               : 'bg-yellow-100 text-yellow-800'
                           }`}>
-                            {order.payment_status}
+                            {order.status}
                           </span>
                         )}
                       </div>
                     </div>
                     
                     {/* Delivery Address */}
-                    {(order.delivery_address || order.delivery_city || order.delivery_zip_code) && (
+                    {(order.address || order.city || order.zipCode) && (
                       <div className="mb-3 p-3 bg-gray-50 rounded-lg">
                         <h5 className="text-xs lg:text-sm font-medium text-gray-700 mb-1">Delivery Address:</h5>
                         <div className="text-xs lg:text-sm text-gray-600">
-                          {order.delivery_address && <p>{order.delivery_address}</p>}
-                          {(order.delivery_city || order.delivery_zip_code) && (
+                          {order.address && <p>{order.address}</p>}
+                          {(order.city || order.zipCode) && (
                             <p>
-                              {order.delivery_city && order.delivery_city}
-                              {order.delivery_city && order.delivery_zip_code && ', '}
-                              {order.delivery_zip_code && order.delivery_zip_code}
+                              {order.city && order.city}
+                              {order.city && order.zipCode && ', '}
+                              {order.zipCode && order.zipCode}
                             </p>
                           )}
                         </div>
