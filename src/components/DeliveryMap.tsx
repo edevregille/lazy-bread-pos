@@ -140,12 +140,9 @@ export default function DeliveryMap({ orders, deliveryDate }: DeliveryMapProps) 
   );
 
   // Load Google Maps script
-  useEffect(() => {
-    console.log('DeliveryMap: Loading Google Maps script');
-    
+  useEffect(() => {    
     loadGoogleMapsScript()
       .then(() => {
-        console.log('DeliveryMap: Google Maps loaded successfully');
         setMapsLoaded(true);
         setLoading(false);
       })
@@ -158,10 +155,6 @@ export default function DeliveryMap({ orders, deliveryDate }: DeliveryMapProps) 
 
   // Initialize map after Google Maps is loaded
   useEffect(() => {
-    console.log('DeliveryMap: Checking map initialization conditions');
-    console.log('mapsLoaded:', mapsLoaded);
-    console.log('mapRef.current:', !!mapRef.current);
-    console.log('ordersWithAddress.length:', ordersWithAddress.length);
     
     // Only initialize if Google Maps is loaded and we have orders with addresses
     if (!mapsLoaded || ordersWithAddress.length === 0) {
@@ -175,10 +168,7 @@ export default function DeliveryMap({ orders, deliveryDate }: DeliveryMapProps) 
     }
     
     const initializeMap = () => {
-      console.log('DeliveryMap: Initializing map');
-      console.log('mapRef.current:', !!mapRef.current);
-      console.log('window.google:', !!window.google);
-      console.log('window.google.maps:', !!(window.google && window.google.maps));
+    
       
       if (!mapRef.current) {
         console.error('DeliveryMap: mapRef.current is null');
@@ -193,7 +183,6 @@ export default function DeliveryMap({ orders, deliveryDate }: DeliveryMapProps) 
       }
 
       try {
-        console.log('DeliveryMap: Creating map instance');
         // Create map centered on Portland, OR
         const portland = { lat: 45.5152, lng: -122.6784 };
         const newMap = new window.google.maps.Map(mapRef.current, {
@@ -208,7 +197,6 @@ export default function DeliveryMap({ orders, deliveryDate }: DeliveryMapProps) 
           ]
         });
 
-        console.log('DeliveryMap: Map created successfully');
         setMap(newMap);
       } catch (error) {
         console.error('DeliveryMap: Map initialization error:', error);
@@ -228,7 +216,6 @@ export default function DeliveryMap({ orders, deliveryDate }: DeliveryMapProps) 
 
     // Cleanup function
     return () => {
-      console.log('DeliveryMap: Cleaning up map initialization');
       clearTimeout(timer);
     };
   }, [mapsLoaded, ordersWithAddress.length]);

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import DeliveryMap from './DeliveryMap';
+import { markOrderAsDelivered, Result, getPaymentIntentStatus, capturePayment } from '@/lib/deliveryService';
 
 type OrderItem = {
   name: string;
@@ -25,6 +26,8 @@ interface Order {
   createdAt: string;
   status?: string;
   deliveryDate?: string;
+  stripePaymentIntentId?: string;
+  paymentStatus?: string;
 }
 
 interface OrdersResponse {
@@ -47,6 +50,10 @@ export default function OrdersList() {
   const [error, setError] = useState<string | null>(null);
   const [selectedDeliveryDate, setSelectedDeliveryDate] = useState<string | null>(null);
   const [deliveryDateGroups, setDeliveryDateGroups] = useState<DeliveryDateSummary[]>([]);
+  const [deliveringOrders, setDeliveringOrders] = useState<Set<string>>(new Set());
+  const [deliveryMessages, setDeliveryMessages] = useState<Record<string, string>>({});
+  const [capturingPayments, setCapturingPayments] = useState<Set<string>>(new Set());
+  const [captureMessages, setCaptureMessages] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchOrders();
@@ -74,10 +81,12 @@ export default function OrdersList() {
         console.log('Orders data received:', data.orders);
         // Log a sample order to see the date format
         if (data.orders.length > 0) {
-          console.log('Sample order created_at:', data.orders[0].createdAt);
-          console.log('Sample order delivery_date:', data.orders[0].deliveryDate);
+          const ordersWithStatus = await fetchPaymentsStatus(data.orders);
+          console.log('Orders with status fetched:', ordersWithStatus);
+          setOrders(ordersWithStatus);
+        } else {
+          setOrders(data.orders);
         }
-        setOrders(data.orders);
       } else {
         setError('Failed to fetch orders');
       }
@@ -87,6 +96,17 @@ export default function OrdersList() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchPaymentsStatus = async (orders: Order[]) => {
+    const ordersWithStatusPromises = orders.map(async (order) => {
+      console.log('Fetching payment status for order:', order.id, order.stripePaymentIntentId);
+      if (order.stripePaymentIntentId) {
+        return { ...order, paymentStatus: await getPaymentIntentStatus(order.stripePaymentIntentId) };
+      }
+      return order;
+    });
+    return await Promise.all(ordersWithStatusPromises);
   };
 
   const groupOrdersByDeliveryDate = (orders: Order[]): DeliveryDateSummary[] => {
@@ -188,6 +208,94 @@ export default function OrdersList() {
 
   const getTotalBreadCount = (breadSummary: { [key: string]: number }) => {
     return Object.values(breadSummary).reduce((total, quantity) => total + quantity, 0);
+  };
+
+  const handleMarkAsDelivered = async (order: Order) => {
+    if (deliveringOrders.has(order.id)) return;
+
+    setDeliveringOrders(prev => new Set(prev).add(order.id));
+    setDeliveryMessages(prev => ({ ...prev, [order.id]: '' }));
+
+    try {
+      const result: Result = await markOrderAsDelivered(order.id);
+      
+      if (result.success) {
+        setDeliveryMessages(prev => ({ 
+          ...prev, 
+          [order.id]: 'Order marked as delivered successfully!' 
+        }));
+        
+        // Refresh orders to show updated status
+        setTimeout(() => {
+          fetchOrders();
+          setDeliveryMessages(prev => {
+            const newMessages = { ...prev };
+            delete newMessages[order.id];
+            return newMessages;
+          });
+        }, 2000);
+      } else {
+        setDeliveryMessages(prev => ({ 
+          ...prev, 
+          [order.id]: `Error: ${result.error}` 
+        }));
+      }
+    } catch (error) {
+      setDeliveryMessages(prev => ({ 
+        ...prev, 
+        [order.id]: `Error: ${error instanceof Error ? error.message : 'Failed to mark as delivered'}` 
+      }));
+    } finally {
+      setDeliveringOrders(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(order.id);
+        return newSet;
+      });
+    }
+  };
+
+  const handleCapturePayment = async (order: Order) => {
+    if (capturingPayments.has(order.id) || !order.stripePaymentIntentId) return;
+
+    setCapturingPayments(prev => new Set(prev).add(order.id));
+    setCaptureMessages(prev => ({ ...prev, [order.id]: '' }));
+
+    try {
+      const result: Result = await capturePayment(order.stripePaymentIntentId);
+      
+      if (result.success) {
+        setCaptureMessages(prev => ({ 
+          ...prev, 
+          [order.id]: 'Payment captured successfully!' 
+        }));
+        
+        // Refresh orders to show updated payment status
+        setTimeout(() => {
+          fetchOrders();
+          setCaptureMessages(prev => {
+            const newMessages = { ...prev };
+            delete newMessages[order.id];
+            return newMessages;
+          });
+        }, 2000);
+      } else {
+        setCaptureMessages(prev => ({ 
+          ...prev, 
+          [order.id]: `Error: ${result.error}` 
+        }));
+      }
+    } catch (error) {
+      setCaptureMessages(prev => ({ 
+        ...prev, 
+        [order.id]: `Error: ${error instanceof Error ? error.message : 'Failed to capture payment'}` 
+      }));
+    } finally {
+      setCapturingPayments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(order.id);
+        return newSet;
+      });
+    }
   };
 
   const selectedGroup = deliveryDateGroups.find(group => group.date === selectedDeliveryDate);
@@ -359,11 +467,20 @@ export default function OrdersList() {
                         </p>
                         {order.status && (
                           <span className={`inline-block px-2 py-1 text-xs rounded-full mt-1 ${
-                            order.status === 'succeeded' 
+                            order.status === 'delivered' 
                               ? 'bg-green-100 text-green-800' 
                               : 'bg-yellow-100 text-yellow-800'
                           }`}>
-                            {order.status}
+                            delivery:{order.status}
+                          </span>
+                        )}
+                        {order.paymentStatus && (
+                          <span className={`inline-block px-2 py-1 text-xs rounded-full mt-1 ${
+                            order.paymentStatus === 'succeeded' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            payment:{order.paymentStatus}
                           </span>
                         )}
                       </div>
@@ -406,6 +523,92 @@ export default function OrdersList() {
                           </span>
                         </div>
                       )}
+                    </div>
+
+                    {/* Payment and Delivery Actions */}
+                    <div className="mt-4 pt-3 border-t border-gray-200">
+                      <div className="space-y-3">
+                        {/* Messages */}
+                        <div className="space-y-1">
+                          {deliveryMessages[order.id] && (
+                            <div className={`text-sm ${
+                              deliveryMessages[order.id].startsWith('Error') 
+                                ? 'text-red-600' 
+                                : 'text-green-600'
+                            }`}>
+                              {deliveryMessages[order.id]}
+                            </div>
+                          )}
+                          {captureMessages[order.id] && (
+                            <div className={`text-sm ${
+                              captureMessages[order.id].startsWith('Error') 
+                                ? 'text-red-600' 
+                                : 'text-green-600'
+                            }`}>
+                              {captureMessages[order.id]}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          {/* Capture Payment Button */}
+                          {order.stripePaymentIntentId && (
+                            <button
+                              onClick={() => handleCapturePayment(order)}
+                              disabled={capturingPayments.has(order.id) || order.paymentStatus === 'succeeded'}
+                              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                order.paymentStatus === 'succeeded'
+                                  ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                                  : capturingPayments.has(order.id)
+                                  ? 'bg-blue-300 text-white cursor-not-allowed'
+                                  : 'bg-blue-500 text-white hover:bg-blue-600'
+                              }`}
+                            >
+                              {capturingPayments.has(order.id) ? (
+                                <span className="flex items-center justify-center gap-2">
+                                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                  </svg>
+                                  Capturing...
+                                </span>
+                              ) : order.paymentStatus === 'succeeded' ? (
+                                'Payment Captured ✓'
+                              ) : (
+                                'Capture Payment'
+                              )}
+                            </button>
+                          )}
+
+                          {/* Mark as Delivered Button */}
+                          <button
+                            onClick={() => handleMarkAsDelivered(order)}
+                            disabled={deliveringOrders.has(order.id) || order.status === 'delivered'}
+                            className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                              order.status === 'delivered'
+                                ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                                : deliveringOrders.has(order.id)
+                                ? 'bg-blue-300 text-white cursor-not-allowed'
+                                : 'bg-green-500 text-white hover:bg-green-600'
+                            }`}
+                          >
+                            {deliveringOrders.has(order.id) ? (
+                              <span className="flex items-center justify-center gap-2">
+                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                                Processing...
+                              </span>
+                            ) : order.status === 'delivered' ? (
+                              'Delivered ✓'
+                            ) : (
+                              'Mark as Delivered'
+                            )}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
