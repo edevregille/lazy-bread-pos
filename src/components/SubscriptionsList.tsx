@@ -203,7 +203,7 @@ export default function SubscriptionsList() {
         {/* Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-blue-50 p-4 rounded-lg">
-            <div className="text-sm font-medium text-blue-600">Total Subscriptions</div>
+            <div className="text-sm font-medium text-blue-600">Total ActiveSubscriptions</div>
             <div className="text-2xl font-bold text-blue-900">{metrics.totalCount}</div>
             <div className="text-xs text-blue-500">Active subscriptions</div>
           </div>

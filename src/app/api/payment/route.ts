@@ -24,6 +24,9 @@ export async function POST(req: NextRequest) {
       payment_method_types: ["card_present"],
       capture_method: "automatic",
       amount: calculateCartTotal(products, cart) * 100,
+      metadata : {
+        orderType: "in-person",
+      },
       customer: customer && customer.id ? customer.id : undefined,
     });
     await getStripe().terminal.readers.processPaymentIntent(reader_id, {

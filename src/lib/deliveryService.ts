@@ -1,6 +1,7 @@
 export interface Result {
   success: boolean;
   error?: string;
+  paymentIntentStatus?: string;
 }
 
 export const markOrderAsDelivered = async (orderId: string): Promise<Result> => {
@@ -55,7 +56,8 @@ export const capturePayment = async (paymentIntentId: string): Promise<Result> =
         const captureResult = await captureResponse.json();
         if (captureResult.success) {
             return {
-                success: true
+                success: true,
+                paymentIntentStatus: captureResult.paymentIntent.status,
             };
         } else {
             throw new Error('Payment capture was not successful');

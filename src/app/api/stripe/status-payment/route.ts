@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
     // Retrieve the payment intent to get its status
     const paymentIntent = await getStripe().paymentIntents.retrieve(paymentIntentId);
     
+    console.log('Payment intent status:', paymentIntent.status, paymentIntent.id);
     return NextResponse.json({
       success: true,
       paymentIntent: {

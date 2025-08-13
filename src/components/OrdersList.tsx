@@ -103,9 +103,8 @@ export default function OrdersList() {
 
   const fetchPaymentsStatus = async (orders: Order[]) => {
     const ordersWithStatusPromises = orders.map(async (order) => {
-      console.log('Fetching payment status for order:', order.id, order.stripePaymentIntentId);
       if (order.stripePaymentIntentId) {
-        return { ...order, paymentStatus: await getPaymentIntentStatus(order.stripePaymentIntentId) };
+        return { ...order, stripePaymentStatus: await getPaymentIntentStatus(order.stripePaymentIntentId) };
       }
       return order;
     });
@@ -271,7 +270,7 @@ export default function OrdersList() {
           ...prev, 
           [order.id]: 'Payment captured successfully!' 
         }));
-        
+
         // Refresh orders to show updated payment status
         setTimeout(() => {
           fetchOrders();
