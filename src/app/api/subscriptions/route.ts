@@ -2,23 +2,27 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
+
+    console.log('process.env.SUBSCRIPTIONS_API_URL', process.env.SUBSCRIPTIONS_API_URL);
     // Get the API Gateway URL from environment variable
     const apiGatewayUrl = process.env.SERVICE_ORDERS_API_URL;
     
     if (!apiGatewayUrl) {
       return NextResponse.json(
-        { error: 'Orders API URL not configured' },
+        { error: 'Subscriptions API URL not configured' },
         { status: 500 }
       );
     }
 
-    // Fetch orders from the AWS API Gateway
-    const response = await fetch(`${apiGatewayUrl}/orders`, {
+    // Fetch subscriptions from the AWS API Gateway
+    const response = await fetch(`${apiGatewayUrl}/subscriptions`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
     });
+
+    console.log('response', response);
 
     if (!response.ok) {
       throw new Error(`Failed to fetch orders: ${response.statusText}`);
@@ -28,9 +32,9 @@ export async function GET() {
     
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error fetching orders:', error);
+    console.error('Error fetching subscriptions:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch orders', message: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Failed to fetch subscriptions', message: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

@@ -14,7 +14,7 @@ export default function Header() {
   return (
     <header className="flex items-center justify-between p-3 sm:p-6">
       <div className="flex items-center space-x-2">
-        <h1 className="text-lg sm:text-2xl font-semibold text-black">Lazy Bread PoS</h1>
+        <h1 className="text-lg sm:text-2xl font-semibold text-black">Lazy Bread Console</h1>
       </div>
 
       <button

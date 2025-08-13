@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Update the order status in Firebase
-    const apiGatewayUrl = process.env.ORDERS_API_URL;
+    const apiGatewayUrl = process.env.SERVICE_ORDERS_API_URL ;
     if (!apiGatewayUrl) {
         return NextResponse.json(
           { error: 'Orders API URL not configured' },

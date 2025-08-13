@@ -12,6 +12,7 @@ import { Product, Cart, LogLevel } from "./types";
 import { products } from "@/config/config";
 import { calculateCartTotal, isValidEmail, fetchReaders, pay, retrievePaymentStatus } from "@/lib/utils";
 import Receipt from "@/components/receipt";
+import SubscriptionsList from "@/components/SubscriptionsList";
 
 const initQty: Cart = {
   additionalCharges: 0,
@@ -21,7 +22,7 @@ products.map((el: Product) => el.id).forEach((el: string) => (initQty[el] = 0));
 
 export default function Home() {
   const { data: session } = useSession();
-  const [activeTab, setActiveTab] = useState<'pos' | 'orders'>('pos');
+  const [activeTab, setActiveTab] = useState<'pos' | 'orders' | 'subscriptions'>('pos');
   const [cart, setCart] = useState<Cart>(initQty);
   const [reader, setReader] = useState<ReaderType | null>(null);
   const [statusMsg, setStatusMsg] = useState<{
@@ -190,6 +191,16 @@ export default function Home() {
               >
                 Online Orders
               </button>
+              <button
+                onClick={() => setActiveTab('subscriptions')}
+                className={`flex-1 py-2 px-2 sm:px-4 rounded-md font-medium transition-colors text-sm sm:text-base ${
+                  activeTab === 'subscriptions'
+                    ? 'bg-blue-500 text-white'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                Subscriptions
+              </button>
             </div>
           </div>
 
@@ -291,6 +302,11 @@ export default function Home() {
           {/* Orders Tab Content */}
           {activeTab === 'orders' && (
             <OrdersList />
+          )}
+
+          {/* Subscriptions Tab Content */}
+          {activeTab === 'subscriptions' && (
+            <SubscriptionsList />
           )}
         </>
       )}

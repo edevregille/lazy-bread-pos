@@ -5,29 +5,32 @@ import DeliveryMap from './DeliveryMap';
 import { markOrderAsDelivered, Result, getPaymentIntentStatus, capturePayment } from '@/lib/deliveryService';
 
 type OrderItem = {
+  id: string;
   name: string;
+  price: number;
   quantity: number;
-  unit_cost?: number;
-  price?: number;
+  total: number;
 };
 
 interface Order {
   id: string;
-  email?: string;
-  customerName?: string;
-  phone?: string;
-  address?: string;
-  city?: string;
-  zipCode?: string;
+  items: OrderItem[];
+  orderType: 'online' | 'subscription' | 'in-person';
+  deliveryDate: string;
+  address: string;
+  city: string;
+  zipCode: string;
+  customerName: string;
+  email: string;
+  phone: string;
+  comments: string;
   totalAmount: number;
-  items?: OrderItem[];
-  order_items?: OrderItem[];
-  additional_charges?: number;
-  createdAt: string;
-  status?: string;
-  deliveryDate?: string;
-  stripePaymentIntentId?: string;
-  paymentStatus?: string;
+  status: 'pending' | 'confirmed' | 'delivered' | 'cancelled';
+  createdAt: Date;
+  userId?: string;
+  stripeCustomerId: string;
+  stripePaymentIntentId: string;
+  stripePaymentStatus: string;
 }
 
 interface OrdersResponse {
@@ -135,7 +138,7 @@ export default function OrdersList() {
       };
 
       // Use delivery_date if available, otherwise use created_at date
-      const deliveryDate = parseDate(order.deliveryDate || order.createdAt);
+      const deliveryDate = parseDate(order.deliveryDate);
 
       if (!groups[deliveryDate]) {
         groups[deliveryDate] = {
@@ -152,7 +155,7 @@ export default function OrdersList() {
       groups[deliveryDate].orders.push(order);
 
       // Aggregate bread quantities
-      const items = order.items || order.order_items || [];
+      const items = order.items || order.items || [];
       items.forEach(item => {
         if (!groups[deliveryDate].breadSummary[item.name]) {
           groups[deliveryDate].breadSummary[item.name] = 0;
@@ -330,6 +333,8 @@ export default function OrdersList() {
     );
   }
 
+  console.log(orders);
+
   return (
     <div className="flex flex-col lg:flex-row h-full gap-4 lg:gap-6">
       {/* Delivery Date Navigation - Mobile: Horizontal scroll, Desktop: Sidebar */}
@@ -446,18 +451,7 @@ export default function OrdersList() {
                             {order.phone || 'No phone provided'}
                           </p>
                           <p className="text-xs lg:text-sm text-gray-500">
-                            {(() => {
-                              try {
-                                const date = new Date(order.createdAt);
-                                if (isNaN(date.getTime())) {
-                                  return 'Invalid Date';
-                                }
-                                return date.toLocaleString();
-                              } catch (error) {
-                                console.warn(`Error formatting created_at: ${order.createdAt}`, error);
-                                return 'Invalid Date';
-                              }
-                            })()}
+                            {/* {order.createdAt ? order.createdAt.toLocaleDateString() : 'Unknown'} */}
                           </p>
                         </div>
                       </div>
@@ -474,13 +468,13 @@ export default function OrdersList() {
                             delivery:{order.status}
                           </span>
                         )}
-                        {order.paymentStatus && (
+                        {order.stripePaymentStatus && (
                           <span className={`inline-block px-2 py-1 text-xs rounded-full mt-1 ${
-                            order.paymentStatus === 'succeeded' 
+                            order.stripePaymentStatus === 'succeeded' 
                               ? 'bg-green-100 text-green-800' 
                               : 'bg-yellow-100 text-yellow-800'
                           }`}>
-                            payment:{order.paymentStatus}
+                            payment:{order.stripePaymentStatus}
                           </span>
                         )}
                       </div>
@@ -504,22 +498,22 @@ export default function OrdersList() {
                     )}
                     
                     <div className="space-y-1 lg:space-y-2">
-                      {(order.items || order.order_items || []).map((item: OrderItem, index) => (
+                      {(order.items || order.items || []).map((item: OrderItem, index) => (
                         <div key={index} className="flex justify-between text-xs lg:text-sm">
                           <span className="text-gray-700">
                             {item.name} x{item.quantity}
                           </span>
                           <span className="text-gray-600">
-                            {formatCurrency(((item.unit_cost || item.price) || 0) * item.quantity)}
+                            {formatCurrency(item.price || 0 * item.quantity || 0)}
                           </span>
                         </div>
                       ))}
                       
-                      {order.additional_charges && order.additional_charges > 0 && (
+                      {order.comments && (
                         <div className="flex justify-between text-xs lg:text-sm border-t pt-2">
-                          <span className="text-gray-700">Additional Charges</span>
+                          <span className="text-gray-700">Comments</span>
                           <span className="text-gray-600">
-                            {formatCurrency(order.additional_charges)}
+                            {order.comments}
                           </span>
                         </div>
                       )}
@@ -556,9 +550,9 @@ export default function OrdersList() {
                           {order.stripePaymentIntentId && (
                             <button
                               onClick={() => handleCapturePayment(order)}
-                              disabled={capturingPayments.has(order.id) || order.paymentStatus === 'succeeded'}
+                              disabled={capturingPayments.has(order.id) || order.stripePaymentStatus === 'succeeded'}
                               className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                order.paymentStatus === 'succeeded'
+                                order.stripePaymentStatus === 'succeeded'
                                   ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                                   : capturingPayments.has(order.id)
                                   ? 'bg-blue-300 text-white cursor-not-allowed'
@@ -573,7 +567,7 @@ export default function OrdersList() {
                                   </svg>
                                   Capturing...
                                 </span>
-                              ) : order.paymentStatus === 'succeeded' ? (
+                              ) : order.stripePaymentStatus === 'succeeded' ? (
                                 'Payment Captured ✓'
                               ) : (
                                 'Capture Payment'
