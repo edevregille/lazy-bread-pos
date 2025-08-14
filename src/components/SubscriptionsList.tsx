@@ -41,6 +41,9 @@ interface Metrics {
   totalCount: number;
   totalWeeklyBreads: number;
   totalWeeklyRevenue: number;
+  weeklyBreadsByDay: {
+    [key: string]: number;
+  };
 }
 
 export default function SubscriptionsList() {
@@ -50,7 +53,8 @@ export default function SubscriptionsList() {
   const [metrics, setMetrics] = useState<Metrics>({
     totalCount: 0,
     totalWeeklyBreads: 0,
-    totalWeeklyRevenue: 0
+    totalWeeklyRevenue: 0,
+    weeklyBreadsByDay: {}
   });
 
   useEffect(() => {
@@ -85,25 +89,32 @@ export default function SubscriptionsList() {
     
     let totalWeeklyBreads = 0;
     let totalWeeklyRevenue = 0;
+    const weeklyBreadsByDay: { [key: string]: number } = {};
 
     activeSubscriptions.forEach(sub => {
       const items = sub.items || sub.items || [];
       const weeklyMultiplier = getWeeklyMultiplier(sub.frequency);
       
+      let subscriptionWeeklyBreads = 0;
       items.forEach(item => {
-        totalWeeklyBreads += item.quantity * weeklyMultiplier;
+        subscriptionWeeklyBreads += item.quantity * weeklyMultiplier;
       });
       
+      totalWeeklyBreads += subscriptionWeeklyBreads;
       totalWeeklyRevenue += sub.totalAmount || 0 * weeklyMultiplier;
+
+      // Add to day breakdown
+      weeklyBreadsByDay[sub.dayOfWeek] = (weeklyBreadsByDay[sub.dayOfWeek] || 0) + subscriptionWeeklyBreads;
     });
 
     setMetrics({
       totalCount: activeSubscriptions.length,
       totalWeeklyBreads: Math.round(totalWeeklyBreads * 100) / 100, // Round to 2 decimal places
-      totalWeeklyRevenue: Math.round(totalWeeklyRevenue * 100) / 100
+      totalWeeklyRevenue: Math.round(totalWeeklyRevenue * 100) / 100,
+      weeklyBreadsByDay: weeklyBreadsByDay
     });
   };
-
+  console.log(metrics);
   const getWeeklyMultiplier = (frequency?: string): number => {
     switch (frequency?.toLowerCase()) {
       case 'weekly':
@@ -220,6 +231,27 @@ export default function SubscriptionsList() {
             <div className="text-xs text-purple-500">Projected weekly revenue</div>
           </div>
         </div>
+
+        {/* Weekly Breads Breakdown by Day */}
+        {Object.keys(metrics.weeklyBreadsByDay).length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Breads by Delivery Day</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+              {Object.keys(metrics.weeklyBreadsByDay).map((day) => {
+                const breadCount = metrics.weeklyBreadsByDay[day] || 0;
+                return (
+                  <div key={day} className={`p-3 rounded-lg text-center ${breadCount > 0 ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-200'}`}>
+                    <div className="text-sm font-medium text-gray-600">{day}</div>
+                    <div className={`text-xl font-bold ${breadCount > 0 ? 'text-orange-900' : 'text-gray-400'}`}>
+                      {breadCount}
+                    </div>
+                    <div className="text-xs text-gray-500">breads</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Subscriptions List */}
@@ -256,7 +288,7 @@ export default function SubscriptionsList() {
                       <p><strong>Customer:</strong> {subscription.customerName || 'No name provided'}</p>
                       <p><strong>Email:</strong> {subscription.email || 'No email provided'}</p>
                       <p><strong>Phone:</strong> {subscription.phone || 'No phone provided'}</p>
-                      {/* <p><strong>Created:</strong> {subscription.createdAt.toLocaleDateString() || 'Unknown'}</p> */}
+                      <p><strong>Delivery Day:</strong> {subscription.dayOfWeek}</p>
                     </div>
                     
                     {/* Delivery Address */}
