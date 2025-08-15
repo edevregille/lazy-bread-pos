@@ -4,6 +4,21 @@ export interface Result {
   paymentIntentStatus?: string;
 }
 
+export const formatDeliveryDate = (dateString: string): string => {
+  // Convert the ISO date string to a PST date
+  const pstDate = new Date(dateString + 'T00:00:00-08:00'); // Force PST timezone  
+  // Format the date in PST timezone
+  const options: Intl.DateTimeFormatOptions = { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric',
+    timeZone: 'America/Los_Angeles'
+  };
+  
+  return pstDate.toLocaleDateString('en-US', options) + ' (PST)';
+};
+
 export const markOrderAsDelivered = async (orderId: string): Promise<Result> => {
   
     try {

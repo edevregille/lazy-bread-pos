@@ -2,7 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import DeliveryMap from './DeliveryMap';
-import { markOrderAsDelivered, Result, getPaymentIntentStatus, capturePayment } from '@/lib/deliveryService';
+import {
+   markOrderAsDelivered, 
+   Result, 
+   getPaymentIntentStatus, 
+   capturePayment,
+   formatDeliveryDate,
+} from '@/lib/deliveryService';
 
 type OrderItem = {
   id: string;
@@ -116,20 +122,16 @@ export default function OrdersList() {
 
     orders.forEach(order => {
       // Helper function to safely parse dates
-      const parseDate = (dateString: string | undefined): string => {
-        if (!dateString) {
-          // If no date provided, use today's date
-          return new Date().toISOString().split('T')[0];
-        }
+      const parseDate = (dateString: string): string => {
         
         try {
-          const date = new Date(dateString);
-          // Check if the date is valid
-          if (isNaN(date.getTime())) {
-            console.warn(`Invalid date format: ${dateString}, using today's date`);
-            return new Date().toISOString().split('T')[0];
-          }
-          return date.toISOString().split('T')[0];
+          // const date = new Date(dateString);
+          // // Check if the date is valid
+          // if (isNaN(date.getTime())) {
+          //   console.warn(`Invalid date format: ${dateString}, using today's date`);
+          //   return new Date().toISOString().split('T')[0];
+          // }
+          return formatDeliveryDate(dateString);
         } catch (error) {
           console.warn(`Error parsing date: ${dateString}, using today's date`, error);
           return new Date().toISOString().split('T')[0];
@@ -398,7 +400,7 @@ export default function OrdersList() {
             {/* Header */}
             <div className="bg-white p-4 lg:p-6 rounded-lg shadow-md">
               <h2 className="text-xl lg:text-2xl font-bold text-black mb-2">
-                {formatDate(selectedGroup.date)}
+                {selectedGroup.date}
               </h2>
               <p className="text-sm lg:text-base text-gray-600">
                 {selectedGroup.totalOrders} orders • {getTotalBreadCount(selectedGroup.breadSummary)} bread • {formatCurrency(selectedGroup.totalRevenue)} total revenue
