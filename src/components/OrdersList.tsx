@@ -169,24 +169,6 @@ export default function OrdersList() {
     return Object.values(groups).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   };
 
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return 'Invalid Date';
-      }
-      return date.toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-    } catch (error) {
-      console.warn(`Error formatting date: ${dateString}`, error);
-      return 'Invalid Date';
-    }
-  };
-
   const formatShortDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
