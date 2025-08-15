@@ -189,7 +189,7 @@ export default function Home() {
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
-                Online Orders
+                Deliveries
               </button>
               <button
                 onClick={() => setActiveTab('subscriptions')}

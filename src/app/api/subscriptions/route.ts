@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-
-    console.log('process.env.SUBSCRIPTIONS_API_URL', process.env.SUBSCRIPTIONS_API_URL);
     // Get the API Gateway URL from environment variable
     const apiGatewayUrl = process.env.SERVICE_ORDERS_API_URL;
     
@@ -21,8 +19,6 @@ export async function GET() {
         'Content-Type': 'application/json',
       },
     });
-
-    console.log('response', response);
 
     if (!response.ok) {
       throw new Error(`Failed to fetch orders: ${response.statusText}`);
