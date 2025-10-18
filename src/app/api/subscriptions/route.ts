@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   try {
     // Get the API Gateway URL from environment variable
-    const apiGatewayUrl = process.env.SERVICE_ORDERS_API_URL;
+    const apiGatewayUrl = process.env.SERVICE_ORDERS_MGT_API_URL;
     
     if (!apiGatewayUrl) {
       return NextResponse.json(

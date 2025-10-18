@@ -7,13 +7,13 @@ export async function GET() {
     
     if (!apiGatewayUrl) {
       return NextResponse.json(
-        { error: 'Orders API URL not configured' },
+        { error: 'Users API URL not configured' },
         { status: 500 }
       );
     }
 
-    // Fetch orders from the AWS API Gateway
-    const response = await fetch(`${apiGatewayUrl}/orders`, {
+    // Fetch users from the AWS API Gateway
+    const response = await fetch(`${apiGatewayUrl}/users`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -21,17 +21,17 @@ export async function GET() {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch orders: ${response.statusText}`);
+      throw new Error(`Failed to fetch users: ${response.statusText}`);
     }
 
     const data = await response.json();
     
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error fetching orders:', error);
+    console.error('Error fetching users:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch orders', message: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Failed to fetch users', message: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
-} 
+}

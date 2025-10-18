@@ -13,6 +13,7 @@ import { products } from "@/config/config";
 import { calculateCartTotal, isValidEmail, fetchReaders, pay, retrievePaymentStatus } from "@/lib/utils";
 import Receipt from "@/components/receipt";
 import SubscriptionsList from "@/components/SubscriptionsList";
+import CustomersList from "@/components/CustomersList";
 
 const initQty: Cart = {
   additionalCharges: 0,
@@ -22,7 +23,7 @@ products.map((el: Product) => el.id).forEach((el: string) => (initQty[el] = 0));
 
 export default function Home() {
   const { data: session } = useSession();
-  const [activeTab, setActiveTab] = useState<'pos' | 'orders' | 'subscriptions'>('pos');
+  const [activeTab, setActiveTab] = useState<'pos' | 'orders' | 'subscriptions' | 'customers'>('pos');
   const [cart, setCart] = useState<Cart>(initQty);
   const [reader, setReader] = useState<ReaderType | null>(null);
   const [statusMsg, setStatusMsg] = useState<{
@@ -37,6 +38,7 @@ export default function Home() {
     (async () => {
       if(session) {
         const result = await fetchReaders();
+        console.log('result', result)
         if (result.success && result.readers.length > 0) {
           setReader(result.readers[0]);
         } else if (!result.success) {
@@ -201,6 +203,16 @@ export default function Home() {
               >
                 Subscriptions
               </button>
+              <button
+                onClick={() => setActiveTab('customers')}
+                className={`flex-1 py-2 px-2 sm:px-4 rounded-md font-medium transition-colors text-sm sm:text-base ${
+                  activeTab === 'customers'
+                    ? 'bg-blue-500 text-white'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                Customers
+              </button>
             </div>
           </div>
 
@@ -307,6 +319,11 @@ export default function Home() {
           {/* Subscriptions Tab Content */}
           {activeTab === 'subscriptions' && (
             <SubscriptionsList />
+          )}
+
+          {/* Customers Tab Content */}
+          {activeTab === 'customers' && (
+            <CustomersList />
           )}
         </>
       )}
