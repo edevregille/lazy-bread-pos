@@ -14,7 +14,7 @@ export const products: Product[] = [
   {
     id: "sweet_bread",
     name: "Sweets Bread",
-    unitCost: 12,
+    unitCost: 10,
   },
   {
     id: "friend_discount",
