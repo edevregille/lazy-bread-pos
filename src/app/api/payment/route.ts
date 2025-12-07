@@ -13,12 +13,12 @@ const getStripe = (): Stripe => {
 
 export async function POST(req: NextRequest) {
   const { cart, email, reader_id  } = await req.json();
-  
   try {
     const customer = email
       ? await getStripe().customers.create({ email })
       : null;
 
+    // create a payment intent for the cart
     const paymentIntent = await getStripe().paymentIntents.create({
       currency: "usd",
       payment_method_types: ["card_present"],
@@ -29,13 +29,32 @@ export async function POST(req: NextRequest) {
       },
       customer: customer && customer.id ? customer.id : undefined,
     });
-    await getStripe().terminal.readers.processPaymentIntent(reader_id, {
-      payment_intent: paymentIntent.id,
-    });
-    return NextResponse.json({id: paymentIntent.id}, { status: 200 });
-  } catch (error) {
-    console.log(error)
-    return new NextResponse(null, {
+
+    // process the payment intent with the reader
+    let attempt = 0;
+    const tries = 3;
+    while (attempt < tries) {
+      attempt++;
+      try {
+        await getStripe().terminal.readers.processPaymentIntent(reader_id, {
+          payment_intent: paymentIntent.id,
+        });
+        return NextResponse.json({id: paymentIntent.id}, { status: 200 });
+      } catch (error: any) {
+        switch (error.code) {
+          case "terminal_reader_timeout":
+            if (attempt == tries) {
+              throw error;
+            }
+            break;  
+          default:
+            throw error;
+        }
+      }
+    }
+  } catch (error: any) {
+
+    return NextResponse.json({error: error.message}, {
         status: 400,
       });
   }
