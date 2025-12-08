@@ -7,12 +7,12 @@ export const Input: React.FC<{
 }> = ({ label, value, handleAdditionalCharge }) => {
   return (
     <div>
-      <label className="block text-sm/6 font-medium text-xl sm:text-3xl font-bold text-center mb-4 sm:mb-8 text-black">
+      <label className="block text-lg sm:text-xl font-bold text-center mb-4 text-gray-800">
         {label}
       </label>
       <div className="mt-2">
-        <div className="flex items-center rounded-md bg-white pl-3 outline outline-1 -outline-offset-1 outline-gray-300 has-[input:focus-within]:outline has-[input:focus-within]:outline-2 has-[input:focus-within]:-outline-offset-2 has-[input:focus-within]:outline-indigo-600">
-          <div className="shrink-0 select-none text-base text-gray-500 sm:text-sm/6">
+        <div className="flex items-center rounded-xl bg-white/90 backdrop-blur-sm pl-4 pr-2 py-2 shadow-md border-2 border-gray-200/50 focus-within:border-blue-500 focus-within:shadow-lg transition-all duration-200">
+          <div className="shrink-0 select-none text-lg sm:text-xl font-semibold text-gray-600">
             $
           </div>
           <input
@@ -21,7 +21,7 @@ export const Input: React.FC<{
             type="text"
             name="price"
             id="price"
-            className="block min-w-0 grow py-1.5 pl-1 pr-3 text-base text-gray-900 placeholder:text-gray-400 focus:outline focus:outline-0 sm:text-sm/6"
+            className="block min-w-0 grow py-2 pl-2 pr-2 text-lg sm:text-xl font-semibold text-gray-900 placeholder:text-gray-400 focus:outline-none bg-transparent"
             placeholder="0.00"
           />
           <div className="grid shrink-0 grid-cols-1 focus-within:relative">
@@ -29,12 +29,12 @@ export const Input: React.FC<{
               id="currency"
               name="currency"
               aria-label="Currency"
-              className="col-start-1 row-start-1 w-full appearance-none rounded-md py-1.5 pl-3 pr-7 text-base text-gray-500 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+              className="col-start-1 row-start-1 w-full appearance-none rounded-lg py-2 pl-3 pr-8 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option>USD</option>
             </select>
             <svg
-              className="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-gray-500 sm:size-4"
+              className="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-gray-500"
               viewBox="0 0 16 16"
               fill="currentColor"
               aria-hidden="true"
