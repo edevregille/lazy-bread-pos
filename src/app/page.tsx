@@ -167,56 +167,9 @@ export default function Home() {
 
   return (
     <div className="font-sans bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 min-h-screen p-3 sm:p-4 md:p-6">
-      <Header />
+      <Header activeTab={activeTab} onTabChange={setActiveTab} />
       {session && (
         <>
-          {/* Tab Navigation */}
-          <div className="mb-6 sm:mb-8">
-            <div className="flex space-x-2 bg-white/80 backdrop-blur-sm p-1.5 rounded-xl shadow-lg border border-gray-200/50">
-              <button
-                onClick={() => setActiveTab('pos')}
-                className={`flex-1 py-2.5 px-3 sm:px-4 rounded-lg font-semibold transition-all duration-200 text-xs sm:text-sm ${
-                  activeTab === 'pos'
-                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-500/30 scale-105'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 active:scale-95'
-                }`}
-              >
-                <span className="hidden sm:inline">Point of Sale</span>
-                <span className="sm:hidden">POS</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('orders')}
-                className={`flex-1 py-2.5 px-3 sm:px-4 rounded-lg font-semibold transition-all duration-200 text-xs sm:text-sm ${
-                  activeTab === 'orders'
-                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-500/30 scale-105'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 active:scale-95'
-                }`}
-              >
-                Deliveries
-              </button>
-              <button
-                onClick={() => setActiveTab('subscriptions')}
-                className={`flex-1 py-2.5 px-3 sm:px-4 rounded-lg font-semibold transition-all duration-200 text-xs sm:text-sm ${
-                  activeTab === 'subscriptions'
-                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-500/30 scale-105'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 active:scale-95'
-                }`}
-              >
-                <span className="hidden sm:inline">Subscriptions</span>
-                <span className="sm:hidden">Subs</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('customers')}
-                className={`flex-1 py-2.5 px-3 sm:px-4 rounded-lg font-semibold transition-all duration-200 text-xs sm:text-sm ${
-                  activeTab === 'customers'
-                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-500/30 scale-105'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50 active:scale-95'
-                }`}
-              >
-                Customers
-              </button>
-            </div>
-          </div>
 
           {/* POS Tab Content */}
           {activeTab === 'pos' && (

@@ -178,7 +178,7 @@ export default function SubscriptionsList() {
   if (loading) {
     return (
       <div className="flex justify-center items-center p-4 sm:p-8">
-        <div className="text-lg text-gray-600">Loading subscriptions...</div>
+        <div className="text-lg sm:text-xl font-semibold text-gray-600">Loading subscriptions...</div>
       </div>
     );
   }
@@ -186,66 +186,68 @@ export default function SubscriptionsList() {
   if (error) {
     return (
       <div className="flex flex-col items-center p-4 sm:p-8">
-        <div className="text-lg text-red-600 mb-4">{error}</div>
-        <button
-          onClick={fetchSubscriptions}
-          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-        >
-          Retry
-        </button>
+        <div className="bg-white/90 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-200/50 text-center">
+          <div className="text-lg sm:text-xl font-semibold text-red-600 mb-4">{error}</div>
+          <button
+            onClick={fetchSubscriptions}
+            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-5 lg:space-y-6">
       {/* Header */}
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold text-black">Subscriptions</h1>
+      <div className="bg-white/90 backdrop-blur-sm p-5 sm:p-6 rounded-2xl shadow-lg border border-gray-200/50">
+        <div className="flex justify-between items-center mb-4 sm:mb-5">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Subscriptions</h1>
           <button
             onClick={fetchSubscriptions}
-            className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
+            className="px-4 py-2 sm:px-5 sm:py-2.5 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-xl text-sm sm:text-base shadow-md hover:shadow-lg transition-all duration-200 active:scale-95"
           >
             Refresh
           </button>
         </div>
         
         {/* Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <div className="text-sm font-medium text-blue-600">Total ActiveSubscriptions</div>
-            <div className="text-2xl font-bold text-blue-900">{metrics.totalCount}</div>
-            <div className="text-xs text-blue-500">Active subscriptions</div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 p-4 sm:p-5 rounded-xl border border-blue-200/50 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02]">
+            <div className="text-sm sm:text-base font-semibold text-blue-600 mb-1">Total Active Subscriptions</div>
+            <div className="text-2xl sm:text-3xl font-bold text-blue-900 mb-1">{metrics.totalCount}</div>
+            <div className="text-xs sm:text-sm text-blue-500">Active subscriptions</div>
           </div>
           
-          <div className="bg-green-50 p-4 rounded-lg">
-            <div className="text-sm font-medium text-green-600">Weekly Breads</div>
-            <div className="text-2xl font-bold text-green-900">{metrics.totalWeeklyBreads}</div>
-            <div className="text-xs text-green-500">Total breads per week</div>
+          <div className="bg-gradient-to-br from-green-50 to-green-100/50 p-4 sm:p-5 rounded-xl border border-green-200/50 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02]">
+            <div className="text-sm sm:text-base font-semibold text-green-600 mb-1">Weekly Breads</div>
+            <div className="text-2xl sm:text-3xl font-bold text-green-900 mb-1">{metrics.totalWeeklyBreads}</div>
+            <div className="text-xs sm:text-sm text-green-500">Total breads per week</div>
           </div>
           
-          <div className="bg-purple-50 p-4 rounded-lg">
-            <div className="text-sm font-medium text-purple-600">Weekly Revenue</div>
-            <div className="text-2xl font-bold text-purple-900">{formatCurrency(metrics.totalWeeklyRevenue)}</div>
-            <div className="text-xs text-purple-500">Projected weekly revenue</div>
+          <div className="bg-gradient-to-br from-purple-50 to-purple-100/50 p-4 sm:p-5 rounded-xl border border-purple-200/50 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02]">
+            <div className="text-sm sm:text-base font-semibold text-purple-600 mb-1">Weekly Revenue</div>
+            <div className="text-2xl sm:text-3xl font-bold text-purple-900 mb-1">{formatCurrency(metrics.totalWeeklyRevenue)}</div>
+            <div className="text-xs sm:text-sm text-purple-500">Projected weekly revenue</div>
           </div>
         </div>
 
         {/* Weekly Breads Breakdown by Day */}
         {Object.keys(metrics.weeklyBreadsByDay).length > 0 && (
-          <div className="mt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Breads by Delivery Day</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+          <div className="mt-4 sm:mt-5">
+            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4">Weekly Breads by Delivery Day</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4">
               {Object.keys(metrics.weeklyBreadsByDay).map((day) => {
                 const breadCount = metrics.weeklyBreadsByDay[day] || 0;
                 return (
-                  <div key={day} className={`p-3 rounded-lg text-center ${breadCount > 0 ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-200'}`}>
-                    <div className="text-sm font-medium text-gray-600">{day}</div>
-                    <div className={`text-xl font-bold ${breadCount > 0 ? 'text-orange-900' : 'text-gray-400'}`}>
+                  <div key={day} className={`p-3 sm:p-4 rounded-xl text-center shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02] ${breadCount > 0 ? 'bg-gradient-to-br from-orange-50 to-orange-100/50 border-2 border-orange-200' : 'bg-gradient-to-br from-gray-50 to-gray-100/50 border-2 border-gray-200'}`}>
+                    <div className="text-sm sm:text-base font-semibold text-gray-600 mb-1">{day}</div>
+                    <div className={`text-xl sm:text-2xl font-bold mb-1 ${breadCount > 0 ? 'text-orange-600' : 'text-gray-400'}`}>
                       {breadCount}
                     </div>
-                    <div className="text-xs text-gray-500">breads</div>
+                    <div className="text-xs sm:text-sm text-gray-500">breads</div>
                   </div>
                 );
               })}
@@ -255,23 +257,23 @@ export default function SubscriptionsList() {
       </div>
 
       {/* Subscriptions List */}
-      <div className="bg-white rounded-lg shadow-md">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-black">
+      <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50 overflow-hidden">
+        <div className="p-5 sm:p-6 border-b border-gray-200/50 bg-gradient-to-r from-gray-50/50 to-white">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
             All Subscriptions ({subscriptions.length})
           </h2>
         </div>
         
         {subscriptions.length === 0 ? (
-          <div className="p-8 text-center">
-            <div className="text-lg text-gray-600">No subscriptions found</div>
+          <div className="p-8 sm:p-10 text-center">
+            <div className="text-lg sm:text-xl font-semibold text-gray-600">No subscriptions found</div>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-200/50">
             {subscriptions.map((subscription) => (
               <div
                 key={subscription.id}
-                className="p-6 hover:bg-gray-50 transition-colors"
+                className="p-5 sm:p-6 hover:bg-gray-50/50 transition-all duration-200"
               >
                 <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
                   {/* Customer Info */}
@@ -293,8 +295,8 @@ export default function SubscriptionsList() {
                     
                     {/* Delivery Address */}
                     {(subscription.address || subscription.city || subscription.zipCode) && (
-                      <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                        <h4 className="text-sm font-medium text-gray-700 mb-1">Delivery Address:</h4>
+                      <div className="mt-3 p-3 sm:p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200/50">
+                        <h4 className="text-sm sm:text-base font-semibold text-gray-700 mb-1">Delivery Address:</h4>
                         <div className="text-sm text-gray-600">
                           {subscription.address && <p>{subscription.address}</p>}
                           {(subscription.city || subscription.zipCode) && (

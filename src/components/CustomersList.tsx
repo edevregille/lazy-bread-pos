@@ -84,7 +84,7 @@ export default function CustomersList() {
   if (loading) {
     return (
       <div className="flex justify-center items-center p-4 sm:p-8">
-        <div className="text-lg text-gray-600">Loading customers...</div>
+        <div className="text-lg sm:text-xl font-semibold text-gray-600">Loading customers...</div>
       </div>
     );
   }
@@ -92,13 +92,15 @@ export default function CustomersList() {
   if (error) {
     return (
       <div className="flex flex-col items-center p-4 sm:p-8">
-        <div className="text-lg text-red-600 mb-4">{error}</div>
-        <button
-          onClick={fetchUsers}
-          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-        >
-          Retry
-        </button>
+        <div className="bg-white/90 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-200/50 text-center">
+          <div className="text-lg sm:text-xl font-semibold text-red-600 mb-4">{error}</div>
+          <button
+            onClick={fetchUsers}
+            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
@@ -106,27 +108,29 @@ export default function CustomersList() {
   if (users.length === 0) {
     return (
       <div className="flex justify-center items-center p-4 sm:p-8">
-        <div className="text-lg text-gray-600">No customers found</div>
+        <div className="bg-white/90 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-200/50">
+          <div className="text-lg sm:text-xl font-semibold text-gray-600">No customers found</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 lg:space-y-6">
+    <div className="space-y-4 sm:space-y-5 lg:space-y-6">
       {/* Header */}
-      <div className="bg-white p-4 lg:p-6 rounded-lg shadow-md">
+      <div className="bg-white/90 backdrop-blur-sm p-5 sm:p-6 rounded-2xl shadow-lg border border-gray-200/50">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
-            <h2 className="text-xl lg:text-2xl font-bold text-black mb-2">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
               Customers ({users.length})
             </h2>
-            <p className="text-sm lg:text-base text-gray-600">
+            <p className="text-sm sm:text-base lg:text-lg text-gray-600">
               Manage your customer database
             </p>
           </div>
           <button
             onClick={fetchUsers}
-            className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm font-medium"
+            className="px-4 py-2 sm:px-5 sm:py-2.5 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-xl text-sm sm:text-base shadow-md hover:shadow-lg transition-all duration-200 active:scale-95"
           >
             Refresh
           </button>
@@ -134,14 +138,14 @@ export default function CustomersList() {
       </div>
 
       {/* Search Bar */}
-      <div className="bg-white p-4 lg:p-6 rounded-lg shadow-md">
+      <div className="bg-white/90 backdrop-blur-sm p-5 sm:p-6 rounded-2xl shadow-lg border border-gray-200/50">
         <div className="relative">
           <input
             type="text"
             placeholder="Search customers by name, email, phone, or Stripe ID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 pl-10 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm hover:shadow-md"
           />
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,11 +156,11 @@ export default function CustomersList() {
       </div>
 
       {/* Customers Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
         {filteredUsers.map((user) => (
           <div
             key={user.uid}
-            className="bg-white p-4 lg:p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow"
+            className="bg-white/90 backdrop-blur-sm p-5 sm:p-6 rounded-2xl shadow-lg border-2 border-gray-200/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
           >
             {/* Customer Header */}
             <div className="flex items-start justify-between mb-4">
@@ -188,8 +192,8 @@ export default function CustomersList() {
                 </p>
               </div>
               <div className="ml-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600 font-semibold text-lg">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center shadow-md border-2 border-blue-200/50">
+                  <span className="text-blue-600 font-bold text-lg sm:text-xl">
                     {user.displayName ? user.displayName.charAt(0).toUpperCase() : '?'}
                   </span>
                 </div>
@@ -199,8 +203,8 @@ export default function CustomersList() {
 
             {/* Delivery Address */}
             {(user.deliveryAddress || user.deliveryCity || user.deliveryState || user.deliveryZipCode) && (
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                <h5 className="text-xs font-medium text-gray-700 mb-1">Delivery Address:</h5>
+              <div className="mb-4 p-3 sm:p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200/50">
+                <h5 className="text-xs sm:text-sm font-semibold text-gray-700 mb-1">Delivery Address:</h5>
                 <div className="text-sm text-gray-600">
                   {user.deliveryAddress && <p>{user.deliveryAddress}</p>}
                   {(user.deliveryCity || user.deliveryState || user.deliveryZipCode) && (
@@ -216,8 +220,8 @@ export default function CustomersList() {
             )}
 
             {/* Customer Info */}
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-              <h5 className="text-xs font-medium text-gray-700 mb-1">Customer Info:</h5>
+            <div className="mb-4 p-3 sm:p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200/50">
+              <h5 className="text-xs sm:text-sm font-semibold text-gray-700 mb-1">Customer Info:</h5>
               <div className="text-sm text-gray-600">
                 <p>UID: {user.uid}</p>
                 <p>Created: {formatDate(user.createdAt)}</p>
@@ -242,9 +246,9 @@ export default function CustomersList() {
 
       {/* No Results Message */}
       {filteredUsers.length === 0 && searchTerm && (
-        <div className="bg-white p-8 rounded-lg shadow-md text-center">
-          <div className="text-gray-500 text-lg mb-2">No customers found</div>
-          <div className="text-gray-400 text-sm">
+        <div className="bg-white/90 backdrop-blur-sm p-8 sm:p-10 rounded-2xl shadow-lg border border-gray-200/50 text-center">
+          <div className="text-gray-600 text-lg sm:text-xl font-semibold mb-2">No customers found</div>
+          <div className="text-gray-500 text-sm sm:text-base">
             Try adjusting your search terms
           </div>
         </div>

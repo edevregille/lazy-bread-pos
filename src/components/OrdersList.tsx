@@ -289,7 +289,7 @@ export default function OrdersList() {
   if (loading) {
     return (
       <div className="flex justify-center items-center p-4 sm:p-8">
-        <div className="text-lg text-gray-600">Loading orders...</div>
+        <div className="text-lg sm:text-xl font-semibold text-gray-600">Loading orders...</div>
       </div>
     );
   }
@@ -297,13 +297,15 @@ export default function OrdersList() {
   if (error) {
     return (
       <div className="flex flex-col items-center p-4 sm:p-8">
-        <div className="text-lg text-red-600 mb-4">{error}</div>
-        <button
-          onClick={fetchOrders}
-          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-        >
-          Retry
-        </button>
+        <div className="bg-white/90 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-200/50 text-center">
+          <div className="text-lg sm:text-xl font-semibold text-red-600 mb-4">{error}</div>
+          <button
+            onClick={fetchOrders}
+            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
@@ -311,7 +313,9 @@ export default function OrdersList() {
   if (orders.length === 0) {
     return (
       <div className="flex justify-center items-center p-4 sm:p-8">
-        <div className="text-lg text-gray-600">No orders found</div>
+        <div className="bg-white/90 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-200/50">
+          <div className="text-lg sm:text-xl font-semibold text-gray-600">No orders found</div>
+        </div>
       </div>
     );
   }
@@ -319,14 +323,14 @@ export default function OrdersList() {
   console.log(orders);
 
   return (
-    <div className="flex flex-col lg:flex-row h-full gap-4 lg:gap-6">
+    <div className="flex flex-col lg:flex-row h-full gap-4 sm:gap-5 lg:gap-6">
       {/* Delivery Date Navigation - Mobile: Horizontal scroll, Desktop: Sidebar */}
-      <div className="lg:w-64 bg-white rounded-lg shadow-md p-4 order-1 lg:order-1">
+      <div className="lg:w-64 bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50 p-4 sm:p-5 order-1 lg:order-1">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-black">Delivery Dates</h3>
+          <h3 className="text-lg sm:text-xl font-bold text-gray-900">Delivery Dates</h3>
           <button
             onClick={fetchOrders}
-            className="px-2 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+            className="px-3 py-1.5 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-xl text-xs sm:text-sm shadow-md hover:shadow-lg transition-all duration-200 active:scale-95"
           >
             Refresh
           </button>
@@ -339,14 +343,14 @@ export default function OrdersList() {
               <button
                 key={group.date}
                 onClick={() => setSelectedDeliveryDate(group.date)}
-                className={`flex-shrink-0 p-3 rounded-lg transition-colors whitespace-nowrap ${
+                className={`flex-shrink-0 p-3 sm:p-4 rounded-xl transition-all duration-200 whitespace-nowrap shadow-md hover:shadow-lg active:scale-95 ${
                   selectedDeliveryDate === group.date
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-blue-500/30'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200/50'
                 }`}
               >
-                <div className="font-medium">{formatShortDate(group.date)}</div>
-                <div className="text-xs opacity-75">
+                <div className="font-semibold text-sm sm:text-base">{formatShortDate(group.date)}</div>
+                <div className="text-xs opacity-75 mt-1">
                   {group.totalOrders} orders • {getTotalBreadCount(group.breadSummary)} bread
                 </div>
               </button>
@@ -360,14 +364,14 @@ export default function OrdersList() {
             <button
               key={group.date}
               onClick={() => setSelectedDeliveryDate(group.date)}
-              className={`w-full text-left p-3 rounded-lg transition-colors ${
+              className={`w-full text-left p-3 sm:p-4 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 ${
                 selectedDeliveryDate === group.date
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-blue-500/30'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200/50'
               }`}
             >
-              <div className="font-medium">{formatShortDate(group.date)}</div>
-              <div className="text-sm opacity-75">
+              <div className="font-semibold text-sm sm:text-base">{formatShortDate(group.date)}</div>
+              <div className="text-xs sm:text-sm opacity-75 mt-1">
                 {group.totalOrders} orders • {getTotalBreadCount(group.breadSummary)} bread • {formatCurrency(group.totalRevenue)}
               </div>
             </button>
@@ -378,26 +382,26 @@ export default function OrdersList() {
       {/* Main Content Area */}
       <div className="flex-1 order-2 lg:order-2">
         {selectedGroup && (
-          <div className="space-y-4 lg:space-y-6">
+          <div className="space-y-4 sm:space-y-5 lg:space-y-6">
             {/* Header */}
-            <div className="bg-white p-4 lg:p-6 rounded-lg shadow-md">
-              <h2 className="text-xl lg:text-2xl font-bold text-black mb-2">
+            <div className="bg-white/90 backdrop-blur-sm p-5 sm:p-6 rounded-2xl shadow-lg border border-gray-200/50">
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
                 {selectedGroup.date}
               </h2>
-              <p className="text-sm lg:text-base text-gray-600">
+              <p className="text-sm sm:text-base lg:text-lg text-gray-600">
                 {selectedGroup.totalOrders} orders • {getTotalBreadCount(selectedGroup.breadSummary)} bread • {formatCurrency(selectedGroup.totalRevenue)} total revenue
               </p>
             </div>
 
             {/* Summary Statistics */}
-            <div className="bg-white p-4 lg:p-6 rounded-lg shadow-md">
-              <h3 className="text-lg lg:text-xl font-semibold text-black mb-4">Bread Summary</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
+            <div className="bg-white/90 backdrop-blur-sm p-5 sm:p-6 rounded-2xl shadow-lg border border-gray-200/50">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 mb-4 sm:mb-5">Bread Summary</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5">
                 {Object.entries(selectedGroup.breadSummary).map(([breadName, quantity]) => (
-                  <div key={breadName} className="bg-gray-50 p-3 lg:p-4 rounded-lg">
-                    <div className="font-medium text-black text-sm lg:text-base">{breadName}</div>
-                    <div className="text-xl lg:text-2xl font-bold text-blue-600">{quantity}</div>
-                    <div className="text-xs lg:text-sm text-gray-500">units ordered</div>
+                  <div key={breadName} className="bg-gradient-to-br from-gray-50 to-white p-4 sm:p-5 rounded-xl border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02]">
+                    <div className="font-semibold text-gray-700 text-sm sm:text-base mb-2">{breadName}</div>
+                    <div className="text-2xl sm:text-3xl font-bold text-blue-600 mb-1">{quantity}</div>
+                    <div className="text-xs sm:text-sm text-gray-500">units ordered</div>
                   </div>
                 ))}
               </div>
@@ -407,16 +411,16 @@ export default function OrdersList() {
             <DeliveryMap orders={selectedGroup.orders} deliveryDate={selectedGroup.date} />
 
             {/* Orders List */}
-            <div className="bg-white p-4 lg:p-6 rounded-lg shadow-md">
-              <h3 className="text-lg lg:text-xl font-semibold text-black mb-4">
+            <div className="bg-white/90 backdrop-blur-sm p-5 sm:p-6 rounded-2xl shadow-lg border border-gray-200/50">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 mb-4 sm:mb-5">
                 Orders ({selectedGroup.orders.length})
               </h3>
               
-              <div className="space-y-3 lg:space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {selectedGroup.orders.map((order) => (
                   <div
                     key={order.id}
-                    className="border border-gray-200 p-3 lg:p-4 rounded-lg hover:bg-gray-50"
+                    className="bg-white/80 backdrop-blur-sm border-2 border-gray-200/50 p-4 sm:p-5 rounded-xl shadow-md hover:shadow-lg hover:scale-[1.01] transition-all duration-200"
                   >
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3">
                       <div className="flex-1">
@@ -443,19 +447,19 @@ export default function OrdersList() {
                           {formatCurrency(order.totalAmount)}
                         </p>
                         {order.status && (
-                          <span className={`inline-block px-2 py-1 text-xs rounded-full mt-1 ${
+                          <span className={`inline-block px-2.5 py-1 text-xs font-semibold rounded-full mt-1 shadow-sm ${
                             order.status === 'delivered' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-yellow-100 text-yellow-800'
+                              ? 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300/50' 
+                              : 'bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-800 border border-yellow-300/50'
                           }`}>
                             delivery:{order.status}
                           </span>
                         )}
                         {order.stripePaymentStatus && (
-                          <span className={`inline-block px-2 py-1 text-xs rounded-full mt-1 ${
+                          <span className={`inline-block px-2.5 py-1 text-xs font-semibold rounded-full mt-1 shadow-sm ${
                             order.stripePaymentStatus === 'succeeded' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-yellow-100 text-yellow-800'
+                              ? 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300/50' 
+                              : 'bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-800 border border-yellow-300/50'
                           }`}>
                             payment:{order.stripePaymentStatus}
                           </span>
@@ -465,9 +469,9 @@ export default function OrdersList() {
                     
                     {/* Delivery Address */}
                     {(order.address || order.city || order.zipCode) && (
-                      <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-                        <h5 className="text-xs lg:text-sm font-medium text-gray-700 mb-1">Delivery Address:</h5>
-                        <div className="text-xs lg:text-sm text-gray-600">
+                      <div className="mb-3 p-3 sm:p-4 bg-gradient-to-br from-gray-50 to-white rounded-xl border border-gray-200/50">
+                        <h5 className="text-xs sm:text-sm font-semibold text-gray-700 mb-1">Delivery Address:</h5>
+                        <div className="text-xs sm:text-sm text-gray-600">
                           {order.address && <p>{order.address}</p>}
                           {(order.city || order.zipCode) && (
                             <p>
@@ -528,18 +532,18 @@ export default function OrdersList() {
                         </div>
 
                         {/* Action Buttons */}
-                        <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                           {/* Capture Payment Button */}
                           {order.stripePaymentIntentId && (
                             <button
                               onClick={() => handleCapturePayment(order)}
                               disabled={capturingPayments.has(order.id) || order.stripePaymentStatus === 'succeeded'}
-                              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                              className={`flex-1 px-4 py-2.5 sm:py-3 rounded-xl text-sm sm:text-base font-semibold transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg ${
                                 order.stripePaymentStatus === 'succeeded'
                                   ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                                   : capturingPayments.has(order.id)
                                   ? 'bg-blue-300 text-white cursor-not-allowed'
-                                  : 'bg-blue-500 text-white hover:bg-blue-600'
+                                  : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white'
                               }`}
                             >
                               {capturingPayments.has(order.id) ? (
@@ -562,12 +566,12 @@ export default function OrdersList() {
                           <button
                             onClick={() => handleMarkAsDelivered(order)}
                             disabled={deliveringOrders.has(order.id) || order.status === 'delivered'}
-                            className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                            className={`flex-1 px-4 py-2.5 sm:py-3 rounded-xl text-sm sm:text-base font-semibold transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg ${
                               order.status === 'delivered'
                                 ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                                 : deliveringOrders.has(order.id)
-                                ? 'bg-blue-300 text-white cursor-not-allowed'
-                                : 'bg-green-500 text-white hover:bg-green-600'
+                                ? 'bg-green-300 text-white cursor-not-allowed'
+                                : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
                             }`}
                           >
                             {deliveringOrders.has(order.id) ? (
