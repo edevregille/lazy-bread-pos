@@ -5,7 +5,6 @@ import DeliveryMap from './DeliveryMap';
 import {
    markOrderAsDelivered, 
    Result, 
-   getPaymentIntentStatus, 
    capturePayment,
    formatDeliveryDate,
 } from '@/lib/deliveryService';
@@ -35,7 +34,9 @@ interface Order {
   createdAt: Date;
   userId?: string;
   stripeCustomerId: string;
-  stripePaymentIntentId: string;
+  stripePaymentIntentId?: string | null;
+  stripeSetupIntentId?: string;
+  stripePaymentMethodId?: string;
   stripePaymentStatus: string;
 }
 
@@ -87,15 +88,8 @@ export default function OrdersList() {
       const data: OrdersResponse = await response.json();
       
       if (data.success) {
-        console.log('Orders data received:', data.orders);
-        // Log a sample order to see the date format
-        if (data.orders.length > 0) {
-          const ordersWithStatus = await fetchPaymentsStatus(data.orders);
-          console.log('Orders with status fetched:', ordersWithStatus);
-          setOrders(ordersWithStatus);
-        } else {
-          setOrders(data.orders);
-        }
+        // Use orders directly from Firebase - they already have stripePaymentStatus
+        setOrders(data.orders);
       } else {
         setError('Failed to fetch orders');
       }
@@ -105,16 +99,6 @@ export default function OrdersList() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const fetchPaymentsStatus = async (orders: Order[]) => {
-    const ordersWithStatusPromises = orders.map(async (order) => {
-      if (order.stripePaymentIntentId) {
-        return { ...order, stripePaymentStatus: await getPaymentIntentStatus(order.stripePaymentIntentId) };
-      }
-      return order;
-    });
-    return await Promise.all(ordersWithStatusPromises);
   };
 
   const groupOrdersByDeliveryDate = (orders: Order[]): DeliveryDateSummary[] => {
@@ -241,13 +225,28 @@ export default function OrdersList() {
   };
 
   const handleCapturePayment = async (order: Order) => {
-    if (capturingPayments.has(order.id) || !order.stripePaymentIntentId) return;
+    if (capturingPayments.has(order.id)) return;
+
+    // Check if we have the required information for payment capture
+    if (!order.stripePaymentIntentId && (!order.stripeCustomerId || !order.stripePaymentMethodId)) {
+      setCaptureMessages(prev => ({ 
+        ...prev, 
+        [order.id]: 'Error: Missing payment information. Cannot capture payment.' 
+      }));
+      return;
+    }
 
     setCapturingPayments(prev => new Set(prev).add(order.id));
     setCaptureMessages(prev => ({ ...prev, [order.id]: '' }));
 
     try {
-      const result: Result = await capturePayment(order.stripePaymentIntentId);
+      const result: Result = await capturePayment(
+        order.stripePaymentIntentId || undefined,
+        order.stripeCustomerId,
+        order.stripePaymentMethodId || undefined,
+        order.totalAmount,
+        order.id
+      );
       
       if (result.success) {
         setCaptureMessages(prev => ({ 
@@ -319,8 +318,6 @@ export default function OrdersList() {
       </div>
     );
   }
-
-  console.log(orders);
 
   return (
     <div className="flex flex-col lg:flex-row h-full gap-4 sm:gap-5 lg:gap-6">
@@ -424,9 +421,43 @@ export default function OrdersList() {
                   >
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3">
                       <div className="flex-1">
-                        <h4 className="text-base lg:text-lg font-semibold text-black">
-                          Order #{order.id}
-                        </h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-base lg:text-lg font-semibold text-black">
+                            Order #{order.id}
+                          </h4>
+                          {/* Payment Method Status Icon */}
+                          {order.stripeCustomerId && order.stripePaymentMethodId ? (
+                            <svg 
+                              className="w-5 h-5 text-green-600" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                              title="Ready to collect payment"
+                            >
+                              <path 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round" 
+                                strokeWidth={2} 
+                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" 
+                              />
+                            </svg>
+                          ) : (
+                            <svg 
+                              className="w-5 h-5 text-amber-600" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                              title="This order does not have payment information to allow to collect a payment"
+                            >
+                              <path 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round" 
+                                strokeWidth={2} 
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" 
+                              />
+                            </svg>
+                          )}
+                        </div>
                         <div className="space-y-1 mt-1">
                           <p className="text-xs lg:text-sm text-gray-500">
                             {order.customerName || 'No name provided'}
@@ -534,7 +565,7 @@ export default function OrdersList() {
                         {/* Action Buttons */}
                         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                           {/* Capture Payment Button */}
-                          {order.stripePaymentIntentId && (
+                          {(order.stripePaymentIntentId || (order.stripeCustomerId && order.stripePaymentMethodId)) && (
                             <button
                               onClick={() => handleCapturePayment(order)}
                               disabled={capturingPayments.has(order.id) || order.stripePaymentStatus === 'succeeded'}
@@ -557,7 +588,7 @@ export default function OrdersList() {
                               ) : order.stripePaymentStatus === 'succeeded' ? (
                                 'Payment Captured ✓'
                               ) : (
-                                'Capture Payment'
+                                'Collect Payment'
                               )}
                             </button>
                           )}

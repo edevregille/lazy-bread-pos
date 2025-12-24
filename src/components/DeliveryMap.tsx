@@ -78,18 +78,15 @@ const loadGoogleMapsScript = (): Promise<void> => {
   return new Promise((resolve, reject) => {
     // Check if script is already loaded
     if (window.google && window.google.maps) {
-      console.log('Google Maps already loaded');
       resolve();
       return;
     }
 
     // Check if script is already in the process of loading
     if (document.querySelector('script[src*="maps.googleapis.com"]')) {
-      console.log('Google Maps script already loading');
       // Wait for it to load
       const checkLoaded = () => {
         if (window.google && window.google.maps) {
-          console.log('Google Maps loaded from existing script');
           resolve();
         } else {
           setTimeout(checkLoaded, 100);
@@ -105,14 +102,12 @@ const loadGoogleMapsScript = (): Promise<void> => {
       return;
     }
 
-    console.log('Loading Google Maps script');
     const script = document.createElement('script');
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
     script.async = true;
     script.defer = true;
     
     script.onload = () => {
-      console.log('Google Maps script loaded successfully');
       resolve();
     };
     

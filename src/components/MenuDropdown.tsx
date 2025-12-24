@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 
-type TabType = 'pos' | 'orders' | 'subscriptions' | 'customers';
+type TabType = 'pos' | 'orders' | 'subscriptions' | 'customers' | 'settings';
 
 interface MenuDropdownProps {
   activeTab: TabType;
@@ -21,6 +21,7 @@ const menuItems: MenuItem[] = [
   { id: 'orders', label: 'Deliveries', icon: '🚚' },
   { id: 'subscriptions', label: 'Subscriptions', icon: '📅' },
   { id: 'customers', label: 'Customers', icon: '👥' },
+  { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];
 
 export default function MenuDropdown({ activeTab, onTabChange }: MenuDropdownProps) {

@@ -14,6 +14,7 @@ import { calculateCartTotal, isValidEmail, fetchReaders, pay, retrievePaymentSta
 import Receipt from "@/components/receipt";
 import SubscriptionsList from "@/components/SubscriptionsList";
 import CustomersList from "@/components/CustomersList";
+import SettingsPage from "@/app/settings/page";
 
 const initQty: Cart = {
   additionalCharges: 0,
@@ -23,7 +24,7 @@ products.map((el: Product) => el.id).forEach((el: string) => (initQty[el] = 0));
 
 export default function Home() {
   const { data: session } = useSession();
-  const [activeTab, setActiveTab] = useState<'pos' | 'orders' | 'subscriptions' | 'customers'>('pos');
+  const [activeTab, setActiveTab] = useState<'pos' | 'orders' | 'subscriptions' | 'customers' | 'settings'>('pos');
   const [cart, setCart] = useState<Cart>(initQty);
   const [reader, setReader] = useState<ReaderType | null>(null);
   const [statusMsg, setStatusMsg] = useState<{
@@ -38,7 +39,6 @@ export default function Home() {
     (async () => {
       if(session) {
         const result = await fetchReaders();
-        console.log('result', result)
         if (result.success && result.readers.length > 0) {
           setReader(result.readers[0]);
         } else if (!result.success) {
@@ -319,6 +319,11 @@ export default function Home() {
           {/* Customers Tab Content */}
           {activeTab === 'customers' && (
             <CustomersList />
+          )}
+
+          {/* Settings Tab Content */}
+          {activeTab === 'settings' && (
+            <SettingsPage />
           )}
         </>
       )}

@@ -44,7 +44,6 @@ export default function CustomersList() {
       const data: UsersResponse = await response.json();
       
       if (data.success) {
-        console.log('Users data received:', data.users);
         setUsers(data.users);
       } else {
         setError('Failed to fetch users');

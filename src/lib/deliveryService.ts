@@ -52,7 +52,13 @@ export const markOrderAsDelivered = async (orderId: string): Promise<Result> => 
     }
 }; 
 
-export const capturePayment = async (paymentIntentId: string): Promise<Result> => {
+export const capturePayment = async (
+  paymentIntentId: string | undefined,
+  customerId: string,
+  paymentMethodId: string | undefined,
+  amount: number,
+  orderId: string
+): Promise<Result> => {
     
     try {
         const captureResponse = await fetch('/api/stripe/capture-payment', {
@@ -60,7 +66,13 @@ export const capturePayment = async (paymentIntentId: string): Promise<Result> =
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ paymentIntentId }),
+            body: JSON.stringify({ 
+              paymentIntentId,
+              customerId,
+              paymentMethodId,
+              amount,
+              orderId
+            }),
         });
 
         if (!captureResponse.ok) {
@@ -85,19 +97,4 @@ export const capturePayment = async (paymentIntentId: string): Promise<Result> =
         };
     }
       
-};
-
-export const getPaymentIntentStatus = async (paymentIntentId: string): Promise<string> => {
-  const response = await fetch('/api/stripe/status-payment', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ paymentIntentId }),
-  });
-  if (!response.ok) {
-    throw new Error('Failed to fetch payment intent status');
-  }
-  const data = await response.json();
-  return data.paymentIntent.status;
 };  

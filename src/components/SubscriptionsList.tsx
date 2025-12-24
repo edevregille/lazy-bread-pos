@@ -70,7 +70,6 @@ export default function SubscriptionsList() {
       const data: SubscriptionsResponse = await response.json();
       
       if (data.success) {
-        console.log('Subscriptions data received:', data.subscriptions);
         setSubscriptions(data.subscriptions);
         calculateMetrics(data.subscriptions);
       } else {
