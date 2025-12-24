@@ -427,35 +427,37 @@ export default function OrdersList() {
                           </h4>
                           {/* Payment Method Status Icon */}
                           {order.stripeCustomerId && order.stripePaymentMethodId ? (
-                            <svg 
-                              className="w-5 h-5 text-green-600" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
-                              title="Ready to collect payment"
-                            >
-                              <path 
-                                strokeLinecap="round" 
-                                strokeLinejoin="round" 
-                                strokeWidth={2} 
-                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" 
-                              />
-                            </svg>
+                            <span title="Ready to collect payment">
+                              <svg 
+                                className="w-5 h-5 text-green-600" 
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                              >
+                                <path 
+                                  strokeLinecap="round" 
+                                  strokeLinejoin="round" 
+                                  strokeWidth={2} 
+                                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" 
+                                />
+                              </svg>
+                            </span>
                           ) : (
-                            <svg 
-                              className="w-5 h-5 text-amber-600" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
-                              title="This order does not have payment information to allow to collect a payment"
-                            >
-                              <path 
-                                strokeLinecap="round" 
-                                strokeLinejoin="round" 
-                                strokeWidth={2} 
-                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" 
-                              />
-                            </svg>
+                            <span title="This order does not have payment information to allow to collect a payment">
+                              <svg 
+                                className="w-5 h-5 text-amber-600" 
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                              >
+                                <path 
+                                  strokeLinecap="round" 
+                                  strokeLinejoin="round" 
+                                  strokeWidth={2} 
+                                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" 
+                                />
+                              </svg>
+                            </span>
                           )}
                         </div>
                         <div className="space-y-1 mt-1">
