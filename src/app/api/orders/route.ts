@@ -21,7 +21,18 @@ export async function GET() {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch orders: ${response.statusText}`);
+      // Try to get more details from the response
+      let errorDetails = response.statusText;
+      try {
+        const errorBody = await response.text();
+        if (errorBody) {
+          errorDetails = `${response.statusText}: ${errorBody}`;
+        }
+      } catch (e) {
+        // Ignore if we can't parse the error body
+      }
+      console.error(`Orders API error: ${response.status} ${errorDetails}`);
+      throw new Error(`Failed to fetch orders: ${response.status} ${errorDetails}`);
     }
 
     const data = await response.json();
@@ -29,8 +40,13 @@ export async function GET() {
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error fetching orders:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to fetch orders', message: error instanceof Error ? error.message : 'Unknown error' },
+      { 
+        error: 'Failed to fetch orders', 
+        message: errorMessage,
+        details: error instanceof Error ? error.stack : undefined
+      },
       { status: 500 }
     );
   }

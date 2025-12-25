@@ -174,35 +174,35 @@ export default function SettingsPage() {
   return (
     <div className="w-full">
       <div className="container mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">App Settings</h1>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? 'Saving...' : 'Save Changes'}
-            </button>
+        {/* Save Button - Fixed at top right */}
+        <div className="flex justify-end mb-6">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-md"
+          >
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+
+        {/* Error and Success Messages */}
+        {error && (
+          <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+            {error}
           </div>
+        )}
 
-          {error && (
-            <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
+        {success && (
+          <div className="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+            {success}
+          </div>
+        )}
 
-          {success && (
-            <div className="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
-              {success}
-            </div>
-          )}
-
-          {config && (
-            <div className="space-y-6">
-              {/* Business Settings */}
-              <section className="border-b pb-6">
-                <h2 className="text-2xl font-semibold mb-4 text-gray-900">Business Settings</h2>
+        {config && (
+          <div className="space-y-6">
+            {/* Business Settings Tile */}
+            <section className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+              <h2 className="text-2xl font-semibold mb-4 text-gray-900">Business Settings</h2>
                 {config.BUSINESS_SETTINGS && (
                   <div className="space-y-4">
                     <div>
@@ -288,17 +288,27 @@ export default function SettingsPage() {
                       </label>
                       <textarea
                         value={config.BUSINESS_SETTINGS.excludedDeliveryDates.join('\n')}
-                        onChange={(e) => updateConfig(['BUSINESS_SETTINGS', 'excludedDeliveryDates'], e.target.value.split('\n').filter(s => s.trim()))}
+                        onChange={(e) => {
+                          // Preserve all lines including empty ones for editing
+                          // Only filter empty lines when processing, not during editing
+                          const lines = e.target.value.split('\n');
+                          updateConfig(['BUSINESS_SETTINGS', 'excludedDeliveryDates'], lines);
+                        }}
+                        onBlur={(e) => {
+                          // Filter out empty lines only when user leaves the field
+                          const lines = e.target.value.split('\n').filter(s => s.trim());
+                          updateConfig(['BUSINESS_SETTINGS', 'excludedDeliveryDates'], lines);
+                        }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white"
                         rows={5}
                       />
                     </div>
                   </div>
                 )}
-              </section>
+            </section>
 
-              {/* Bread Types */}
-              <section className="border-b pb-6">
+            {/* Bread Types Tile */}
+            <section className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-2xl font-semibold text-gray-900">Bread Types</h2>
                   <button
@@ -320,21 +330,22 @@ export default function SettingsPage() {
                     + Add Bread Type
                   </button>
                 </div>
-                {config.BREAD_TYPES && config.BREAD_TYPES.map((bread, index) => (
-                  <div key={bread.id} className="mb-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
-                    <div className="flex justify-between items-start mb-3">
-                      <h3 className="text-lg font-semibold text-gray-900">Bread Type #{index + 1}</h3>
-                      <button
-                        onClick={() => {
-                          const newBreads = config.BREAD_TYPES?.filter((_, i) => i !== index) || [];
-                          setConfig({ ...config, BREAD_TYPES: newBreads });
-                        }}
-                        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                    <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {config.BREAD_TYPES && config.BREAD_TYPES.map((bread, index) => (
+                    <div key={bread.id} className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="text-base font-semibold text-gray-900">Bread Type #{index + 1}</h3>
+                        <button
+                          onClick={() => {
+                            const newBreads = config.BREAD_TYPES?.filter((_, i) => i !== index) || [];
+                            setConfig({ ...config, BREAD_TYPES: newBreads });
+                          }}
+                          className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs font-medium"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <div className="space-y-2">
                       <input
                         type="text"
                         value={bread.name}
@@ -343,11 +354,11 @@ export default function SettingsPage() {
                           newBreads[index].name = e.target.value;
                           setConfig({ ...config, BREAD_TYPES: newBreads });
                         }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white"
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md text-gray-900 bg-white"
                         placeholder="Bread Name"
                       />
                       <div>
-                        <label className="block text-sm font-medium text-gray-900 mb-1">Price</label>
+                        <label className="block text-xs font-medium text-gray-900 mb-1">Price</label>
                         <input
                           type="number"
                           step="0.01"
@@ -357,12 +368,12 @@ export default function SettingsPage() {
                             newBreads[index].price = parseFloat(e.target.value) || 0;
                             setConfig({ ...config, BREAD_TYPES: newBreads });
                           }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white"
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md text-gray-900 bg-white"
                           placeholder="0.00"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-900 mb-1">Description</label>
+                        <label className="block text-xs font-medium text-gray-900 mb-1">Description</label>
                         <textarea
                           value={bread.description}
                           onChange={(e) => {
@@ -370,7 +381,7 @@ export default function SettingsPage() {
                             newBreads[index].description = e.target.value;
                             setConfig({ ...config, BREAD_TYPES: newBreads });
                           }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white"
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md text-gray-900 bg-white"
                           placeholder="Description"
                           rows={2}
                         />
@@ -389,13 +400,14 @@ export default function SettingsPage() {
                         <span className="text-sm font-medium">Available for Orders</span>
                       </label>
                     </div>
-                  </div>
-                ))}
-              </section>
+                    </div>
+                  ))}
+                </div>
+            </section>
 
-              {/* JSON Editor (for advanced editing) */}
-              <section>
-                <h2 className="text-2xl font-semibold mb-4 text-gray-900">Advanced: JSON Editor</h2>
+            {/* JSON Editor Tile */}
+            <section className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+              <h2 className="text-2xl font-semibold mb-4 text-gray-900">Advanced: JSON Editor</h2>
                 <textarea
                   value={JSON.stringify(config, null, 2)}
                   onChange={(e) => {
@@ -410,10 +422,9 @@ export default function SettingsPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm text-gray-900 bg-white"
                   rows={20}
                 />
-              </section>
-            </div>
-          )}
-        </div>
+            </section>
+          </div>
+        )}
       </div>
     </div>
   );
