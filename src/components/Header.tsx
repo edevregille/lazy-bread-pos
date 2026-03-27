@@ -2,7 +2,7 @@
 
 import MenuDropdown from "./MenuDropdown";
 
-type TabType = 'pos' | 'orders' | 'subscriptions' | 'customers' | 'settings';
+type TabType = 'pos' | 'orders' | 'subscriptions' | 'customers' | 'revenue' | 'webAnalytics' | 'settings';
 
 interface HeaderProps {
   activeTab: TabType;

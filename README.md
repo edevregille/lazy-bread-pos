@@ -31,6 +31,13 @@ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
 # NextAuth Configuration
 NEXTAUTH_SECRET=your_nextauth_secret_here
 NEXTAUTH_URL=http://localhost:3000
+
+# Revenue tab (reads from S3; requires lazy-bread-revenue Lambda to be deployed)
+REVENUE_BUCKET=your-revenue-s3-bucket-name
+AWS_REGION=us-east-1
+# If not using IAM role (e.g. on Vercel), set:
+# AWS_ACCESS_KEY_ID=your_access_key
+# AWS_SECRET_ACCESS_KEY=your_secret_key
 ```
 
 ### Google Maps API Setup

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 
-type TabType = 'pos' | 'orders' | 'subscriptions' | 'customers' | 'settings';
+type TabType = 'pos' | 'orders' | 'subscriptions' | 'customers' | 'revenue' | 'webAnalytics' | 'settings';
 
 interface MenuDropdownProps {
   activeTab: TabType;
@@ -21,6 +21,8 @@ const menuItems: MenuItem[] = [
   { id: 'orders', label: 'Deliveries', icon: '🚚' },
   { id: 'subscriptions', label: 'Subscriptions', icon: '📅' },
   { id: 'customers', label: 'Customers', icon: '👥' },
+  { id: 'revenue', label: 'Revenue', icon: '📈' },
+  { id: 'webAnalytics', label: 'Web Analytics', icon: '📊' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];
 

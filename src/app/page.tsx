@@ -14,6 +14,8 @@ import { calculateCartTotal, isValidEmail, fetchReaders, pay, retrievePaymentSta
 import Receipt from "@/components/receipt";
 import SubscriptionsList from "@/components/SubscriptionsList";
 import CustomersList from "@/components/CustomersList";
+import RevenueView from "@/components/RevenueView";
+import WebAnalyticsView from "@/components/WebAnalyticsView";
 import SettingsPage from "@/app/settings/page";
 
 const initQty: Cart = {
@@ -24,7 +26,7 @@ products.map((el: Product) => el.id).forEach((el: string) => (initQty[el] = 0));
 
 export default function Home() {
   const { data: session } = useSession();
-  const [activeTab, setActiveTab] = useState<'pos' | 'orders' | 'subscriptions' | 'customers' | 'settings'>('pos');
+  const [activeTab, setActiveTab] = useState<'pos' | 'orders' | 'subscriptions' | 'customers' | 'revenue' | 'webAnalytics' | 'settings'>('pos');
   const [cart, setCart] = useState<Cart>(initQty);
   const [reader, setReader] = useState<ReaderType | null>(null);
   const [statusMsg, setStatusMsg] = useState<{
@@ -319,6 +321,16 @@ export default function Home() {
           {/* Customers Tab Content */}
           {activeTab === 'customers' && (
             <CustomersList />
+          )}
+
+          {/* Revenue Tab Content */}
+          {activeTab === 'revenue' && (
+            <RevenueView />
+          )}
+
+          {/* Web Analytics Tab Content */}
+          {activeTab === 'webAnalytics' && (
+            <WebAnalyticsView />
           )}
 
           {/* Settings Tab Content */}
