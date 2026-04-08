@@ -11,6 +11,7 @@ interface AppConfig {
     price: number;
     description: string;
     availableForOrders: boolean;
+    image_name?: string;
   }>;
   BUSINESS_SETTINGS?: {
     isHolidayMode: boolean;
@@ -384,6 +385,29 @@ export default function SettingsPage() {
                           className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md text-gray-900 bg-white"
                           placeholder="Description"
                           rows={2}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-900 mb-1">
+                          Image name (optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={bread.image_name ?? ''}
+                          onChange={(e) => {
+                            const newBreads = [...(config.BREAD_TYPES || [])];
+                            const next = { ...newBreads[index] };
+                            const v = e.target.value.trim();
+                            if (v) {
+                              next.image_name = v;
+                            } else {
+                              delete next.image_name;
+                            }
+                            newBreads[index] = next;
+                            setConfig({ ...config, BREAD_TYPES: newBreads });
+                          }}
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md text-gray-900 bg-white"
+                          placeholder="e.g. rosemary.jpg"
                         />
                       </div>
                       <label className="flex items-center text-gray-900">
