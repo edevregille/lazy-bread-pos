@@ -58,6 +58,65 @@ function formatTypeFilterLabel(type: string): string {
   return type;
 }
 
+/** Consistent accent for type breakdown lines (matches filter semantics). */
+function typeBreakdownTextClass(type: string): string {
+  switch (type) {
+    case "bread-stand":
+      return "text-amber-800";
+    case "market":
+    case "in-person":
+      return "text-emerald-800";
+    case "online":
+      return "text-violet-800";
+    default:
+      return "text-gray-700";
+  }
+}
+
+type PerTypeStatsRow = {
+  type: string;
+  revenue: number;
+  transactionCount: number;
+  uniqueCustomerCount: number;
+};
+
+const TYPE_SORT_ORDER = ["bread-stand", "market", "online", "in-person"];
+
+function compareTypeKeys(a: string, b: string): number {
+  const ia = TYPE_SORT_ORDER.indexOf(a);
+  const ib = TYPE_SORT_ORDER.indexOf(b);
+  if (ia === -1 && ib === -1) return a.localeCompare(b);
+  if (ia === -1) return 1;
+  if (ib === -1) return -1;
+  return ia - ib;
+}
+
+function aggregatePerTypeStats(transactions: RevenueTx[]): PerTypeStatsRow[] {
+  const acc = new Map<
+    string,
+    { revenue: number; count: number; froms: Set<string> }
+  >();
+  for (const t of transactions) {
+    const key = normalizeTxType(t);
+    let row = acc.get(key);
+    if (!row) {
+      row = { revenue: 0, count: 0, froms: new Set<string>() };
+      acc.set(key, row);
+    }
+    row.revenue += Number(t.amountTotal) || 0;
+    row.count += 1;
+    row.froms.add(String(t.from));
+  }
+  return [...acc.entries()]
+    .sort(([a], [b]) => compareTypeKeys(a, b))
+    .map(([type, v]) => ({
+      type,
+      revenue: v.revenue,
+      transactionCount: v.count,
+      uniqueCustomerCount: v.froms.size,
+    }));
+}
+
 function formatCurrency(cents: number, currency: string = "usd"): string {
   const value = cents / 100;
   return new Intl.NumberFormat("en-US", {
@@ -290,6 +349,11 @@ export default function RevenueView() {
   const txTotalRevenue = useMemo(
     () =>
       transactionsForDetail.reduce((s, t) => s + (Number(t.amountTotal) || 0), 0),
+    [transactionsForDetail]
+  );
+
+  const perTypeStats = useMemo(
+    () => aggregatePerTypeStats(transactionsForDetail),
     [transactionsForDetail]
   );
 
@@ -529,32 +593,6 @@ export default function RevenueView() {
           </div>
         </div>
 
-        <div className="mb-4 max-w-lg">
-          <label
-            htmlFor="tx-type-filter"
-            className="block text-xs font-medium text-gray-600 mb-1"
-          >
-            Type
-          </label>
-          <select
-            id="tx-type-filter"
-            value={txTypeFilter}
-            onChange={(e) => setTxTypeFilter(e.target.value)}
-            disabled={txLoading}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 sm:max-w-xs"
-          >
-            <option value="all">All types</option>
-            {distinctTypesInRange.map((t) => (
-              <option key={t} value={t}>
-                {formatTypeFilterLabel(t)}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-xs text-gray-500">
-            Applies to transaction detail after you load a date range below.
-          </p>
-        </div>
-
         {loading && (
           <p className="text-gray-500">Loading revenue data…</p>
         )}
@@ -638,11 +676,11 @@ export default function RevenueView() {
           Transaction detail
         </h3>
         <p className="text-sm text-gray-600 mb-4">
-          Load uploaded CSV data for a date range. Use the{" "}
-          <span className="font-medium">Type</span> control above to narrow
+          Load uploaded CSV data for a date range. Use{" "}
+          <span className="font-medium">Type</span> under the date fields to narrow
           loaded transactions. Totals above use the same source aggregated by month or year.
         </p>
-        <div className="flex flex-wrap items-end gap-3 mb-4">
+        <div className="flex flex-wrap items-end gap-3 mb-3">
           <div>
             <label htmlFor="tx-from" className="block text-xs font-medium text-gray-600 mb-1">
               From
@@ -676,6 +714,28 @@ export default function RevenueView() {
             {txLoading ? "Loading…" : "Load data"}
           </button>
         </div>
+        <div className="max-w-lg mb-4">
+          <label
+            htmlFor="tx-type-filter"
+            className="block text-xs font-medium text-gray-600 mb-1"
+          >
+            Type
+          </label>
+          <select
+            id="tx-type-filter"
+            value={txTypeFilter}
+            onChange={(e) => setTxTypeFilter(e.target.value)}
+            disabled={txLoading}
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 sm:max-w-xs"
+          >
+            <option value="all">All types</option>
+            {distinctTypesInRange.map((t) => (
+              <option key={t} value={t}>
+                {formatTypeFilterLabel(t)}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {txError && (
           <p className="text-red-600 text-sm font-medium mb-4">{txError}</p>
@@ -690,23 +750,62 @@ export default function RevenueView() {
               </p>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div className="rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2">
-                <div className="text-xs text-gray-500">Total revenue</div>
-                <div className="text-lg font-semibold text-gray-900">
+              <div className="rounded-lg border border-gray-200 border-l-4 border-l-blue-500 bg-blue-50/50 px-3 py-2.5 shadow-sm">
+                <div className="text-xs font-medium text-blue-900/80">Total revenue</div>
+                <div className="text-lg font-semibold text-gray-900 tabular-nums">
                   {formatMoney(txTotalRevenue)}
                 </div>
+                {perTypeStats.length > 0 && (
+                  <ul className="mt-2 space-y-0.5 border-t border-blue-200/80 pt-2 text-xs">
+                    {perTypeStats.map((row) => (
+                      <li
+                        key={row.type}
+                        className={`flex justify-between gap-2 tabular-nums ${typeBreakdownTextClass(row.type)}`}
+                      >
+                        <span>{formatTypeFilterLabel(row.type)}</span>
+                        <span>{formatMoney(row.revenue)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2">
-                <div className="text-xs text-gray-500">Transactions</div>
-                <div className="text-lg font-semibold text-gray-900">
+              <div className="rounded-lg border border-gray-200 border-l-4 border-l-emerald-500 bg-emerald-50/50 px-3 py-2.5 shadow-sm">
+                <div className="text-xs font-medium text-emerald-900/80">Transactions</div>
+                <div className="text-lg font-semibold text-gray-900 tabular-nums">
                   {transactionsForDetail.length}
                 </div>
+                {perTypeStats.length > 0 && (
+                  <ul className="mt-2 space-y-0.5 border-t border-emerald-200/80 pt-2 text-xs">
+                    {perTypeStats.map((row) => (
+                      <li
+                        key={row.type}
+                        className={`flex justify-between gap-2 tabular-nums ${typeBreakdownTextClass(row.type)}`}
+                      >
+                        <span>{formatTypeFilterLabel(row.type)}</span>
+                        <span>{row.transactionCount}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2">
-                <div className="text-xs text-gray-500">Unique customers</div>
-                <div className="text-lg font-semibold text-gray-900">
+              <div className="rounded-lg border border-gray-200 border-l-4 border-l-violet-500 bg-violet-50/50 px-3 py-2.5 shadow-sm">
+                <div className="text-xs font-medium text-violet-900/80">Unique customers</div>
+                <div className="text-lg font-semibold text-gray-900 tabular-nums">
                   {customerCounts.size}
                 </div>
+                {perTypeStats.length > 0 && (
+                  <ul className="mt-2 space-y-0.5 border-t border-violet-200/80 pt-2 text-xs">
+                    {perTypeStats.map((row) => (
+                      <li
+                        key={row.type}
+                        className={`flex justify-between gap-2 tabular-nums ${typeBreakdownTextClass(row.type)}`}
+                      >
+                        <span>{formatTypeFilterLabel(row.type)}</span>
+                        <span>{row.uniqueCustomerCount}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
 
