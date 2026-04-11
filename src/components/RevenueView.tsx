@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  transformUploadToCanonical,
+  type UploadSource,
+} from "@/lib/revenueUploadCsv";
 
 type MonthEntry = {
   period: string;
@@ -38,29 +42,19 @@ const PRESETS = [
   { id: "all", label: "All time" },
 ] as const;
 
-const REQUIRED_CSV_HEADERS = ["Date", "From", "Amount (total)"] as const;
-
-/** Default for uploads when CSV has no Type column; also matches empty Type cells. */
-const UPLOAD_TYPE_OPTIONS = [
-  { value: "bread-stand", label: "Bread stand" },
-  { value: "market", label: "Market" },
-  { value: "online", label: "Online" },
-] as const;
-
-/** Transaction detail tab: filter loaded rows by stored type (legacy rows without type = bread stand). */
-const TX_DETAIL_TYPE_FILTER_OPTIONS = [
-  { value: "all", label: "All types" },
-  { value: "bread-stand", label: "Bread stand" },
-  { value: "market", label: "Market" },
-  { value: "online", label: "Online" },
-] as const;
-
 const THRESHOLD_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 function normalizeTxType(t: RevenueTx): "bread-stand" | "market" | "online" {
   const v = String(t.type ?? "").trim().toLowerCase();
   if (v === "market" || v === "online") return v;
   return "bread-stand";
+}
+
+function formatTypeFilterLabel(type: string): string {
+  if (type === "bread-stand") return "Bread stand";
+  if (type === "market") return "Market";
+  if (type === "online") return "Online";
+  return type;
 }
 
 function formatCurrency(cents: number, currency: string = "usd"): string {
@@ -148,51 +142,6 @@ function aggregateTransactionsToRevenue(transactions: RevenueTx[]): RevenueRespo
   return { byMonth, byYear };
 }
 
-function readFirstLine(text: string): string {
-  const normalized = text.replace(/^\uFEFF/, "");
-  const nl = normalized.indexOf("\n");
-  const line = nl === -1 ? normalized : normalized.slice(0, nl);
-  return line.replace(/\r$/, "");
-}
-
-/** Minimal CSV header parse (handles quoted fields). */
-function parseCsvHeaderRow(line: string): string[] {
-  const out: string[] = [];
-  let field = "";
-  let i = 0;
-  let inQuotes = false;
-  const s = line.replace(/^\uFEFF/, "");
-  while (i < s.length) {
-    const c = s[i];
-    if (c === '"') {
-      inQuotes = !inQuotes;
-      i++;
-      continue;
-    }
-    if (!inQuotes && c === ",") {
-      out.push(field.trim());
-      field = "";
-      i++;
-      continue;
-    }
-    if (!inQuotes && (c === "\n" || c === "\r")) break;
-    field += c;
-    i++;
-  }
-  out.push(field.trim());
-  return out.map((h) => h.replace(/^"|"$/g, ""));
-}
-
-function validateCsvHeaders(headerLine: string): string | null {
-  const cols = parseCsvHeaderRow(headerLine);
-  for (const req of REQUIRED_CSV_HEADERS) {
-    if (!cols.includes(req)) {
-      return `CSV must include columns: ${REQUIRED_CSV_HEADERS.join(", ")}. Found: ${cols.join(", ")}`;
-    }
-  }
-  return null;
-}
-
 function defaultFromUntil(): { from: string; until: string } {
   const now = new Date();
   const y = now.getFullYear();
@@ -259,12 +208,9 @@ export default function RevenueView() {
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadTransactionType, setUploadTransactionType] =
-    useState<string>("bread-stand");
+  const [uploadSource, setUploadSource] = useState<UploadSource>("venmo");
   const [customerFilter, setCustomerFilter] = useState<"all" | number>("all");
-  const [txTypeFilter, setTxTypeFilter] = useState<
-    "all" | "bread-stand" | "market" | "online"
-  >("all");
+  const [txTypeFilter, setTxTypeFilter] = useState<string>("all");
   const [txLoadedOnce, setTxLoadedOnce] = useState(false);
   const [revenueTab, setRevenueTab] = useState<"reports" | "upload">("reports");
 
@@ -304,6 +250,21 @@ export default function RevenueView() {
     setPreset(value);
   };
 
+  const distinctTypesInRange = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of transactions) {
+      set.add(normalizeTxType(t));
+    }
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [transactions]);
+
+  useEffect(() => {
+    if (txTypeFilter === "all") return;
+    if (!distinctTypesInRange.includes(txTypeFilter)) {
+      setTxTypeFilter("all");
+    }
+  }, [distinctTypesInRange, txTypeFilter]);
+
   const transactionsForDetail = useMemo(() => {
     if (txTypeFilter === "all") return transactions;
     return transactions.filter((t) => normalizeTxType(t) === txTypeFilter);
@@ -342,6 +303,7 @@ export default function RevenueView() {
       setTxLoading(true);
       setTxError(null);
       setCustomerFilter("all");
+      setTxTypeFilter("all");
       const res = await fetch(`/api/revenue-transactions?${params.toString()}`);
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -367,10 +329,9 @@ export default function RevenueView() {
       return;
     }
     const text = await file.text();
-    const first = readFirstLine(text);
-    const headerErr = validateCsvHeaders(first);
-    if (headerErr) {
-      setUploadError(headerErr);
+    const canonical = transformUploadToCanonical(uploadSource, text);
+    if ("error" in canonical) {
+      setUploadError(canonical.error);
       return;
     }
     try {
@@ -379,9 +340,8 @@ export default function RevenueView() {
         method: "POST",
         headers: {
           "Content-Type": "text/csv; charset=utf-8",
-          "X-Revenue-Transaction-Type": uploadTransactionType,
         },
-        body: text,
+        body: canonical.csv,
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -451,33 +411,46 @@ export default function RevenueView() {
         {revenueTab === "upload" && (
           <div className="space-y-2">
             <p className="text-sm text-gray-600">
-              CSV must include columns: Date (MM/DD/YYYY), From, Amount (total).
-              Optional column <span className="font-medium">Type</span>:{" "}
-              <code className="text-xs bg-gray-100 px-1 rounded">bread-stand</code>,{" "}
-              <code className="text-xs bg-gray-100 px-1 rounded">market</code>, or{" "}
-              <code className="text-xs bg-gray-100 px-1 rounded">online</code> — leave
-              empty for bread stand. If the file has no Type column, the selection below
-              applies to every row.
+              Choose where this export came from. The app converts it to the upload
+              format (Date, From, Amount (total), Type) before sending.
             </p>
+            <ul className="text-sm text-gray-600 list-disc list-inside space-y-1 max-w-2xl">
+              <li>
+                <span className="font-medium">Venmo</span>: columns{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">Date</code> (MM/DD/YYYY),{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">From</code>,{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">Amount (total)</code>.
+                Each row gets <code className="text-xs bg-gray-100 px-1 rounded">Type</code>{" "}
+                = bread-stand.
+              </li>
+              <li>
+                <span className="font-medium">Stripe</span>: columns{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">created_utc</code> (UTC
+                datetime), <code className="text-xs bg-gray-100 px-1 rounded">gross</code>,{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">customer_name</code>{" "}
+                (optional; empty uses &quot;Unknown&quot;),{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">
+                  payment_metadata[orderType]
+                </code>{" "}
+                for Type (in-person / empty → bread-stand; market / online as-is).
+              </li>
+            </ul>
             <div className="max-w-lg">
               <label
-                htmlFor="revenue-upload-type"
+                htmlFor="revenue-upload-source"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Transaction type (default for CSV without Type column)
+                Report source
               </label>
               <select
-                id="revenue-upload-type"
-                value={uploadTransactionType}
-                onChange={(e) => setUploadTransactionType(e.target.value)}
+                id="revenue-upload-source"
+                value={uploadSource}
+                onChange={(e) => setUploadSource(e.target.value as UploadSource)}
                 disabled={uploadBusy}
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
-                {UPLOAD_TYPE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
+                <option value="venmo">Venmo</option>
+                <option value="stripe">Stripe</option>
               </select>
             </div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -638,9 +611,9 @@ export default function RevenueView() {
           Transaction detail
         </h3>
         <p className="text-sm text-gray-600 mb-4">
-          Load uploaded CSV data for a date range. Use <span className="font-medium">Type</span>{" "}
-          to show all channels or only bread stand, market, or online. Totals above use the same
-          source aggregated by month or year.
+          Load uploaded CSV data for a date range. Filter by{" "}
+          <span className="font-medium">Type</span> using the types present in this range.
+          Totals above use the same source aggregated by month or year.
         </p>
         <div className="flex flex-wrap items-end gap-3 mb-4">
           <div>
@@ -677,17 +650,14 @@ export default function RevenueView() {
             <select
               id="tx-type-filter"
               value={txTypeFilter}
-              onChange={(e) =>
-                setTxTypeFilter(
-                  e.target.value as "all" | "bread-stand" | "market" | "online"
-                )
-              }
+              onChange={(e) => setTxTypeFilter(e.target.value)}
               disabled={txLoading}
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[10.5rem] disabled:opacity-50"
             >
-              {TX_DETAIL_TYPE_FILTER_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
+              <option value="all">All types</option>
+              {distinctTypesInRange.map((t) => (
+                <option key={t} value={t}>
+                  {formatTypeFilterLabel(t)}
                 </option>
               ))}
             </select>
@@ -780,7 +750,7 @@ export default function RevenueView() {
             <p className="text-xs text-gray-500 mb-2">
               Showing {displayedCustomerRows.length} of {customerRows.length} customer(s)
               {txTypeFilter !== "all"
-                ? ` (${TX_DETAIL_TYPE_FILTER_OPTIONS.find((o) => o.value === txTypeFilter)?.label ?? txTypeFilter} only)`
+                ? ` (${formatTypeFilterLabel(txTypeFilter)} only)`
                 : ""}
               {customerFilter !== "all"
                 ? ` (with &gt; ${customerFilter} transaction(s) in range)`
