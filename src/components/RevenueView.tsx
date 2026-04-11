@@ -6,7 +6,6 @@ type MonthEntry = {
   period: string;
   revenueCents: number;
   currency: string;
-  feeCents?: number;
 };
 
 type YearEntry = {
@@ -51,24 +50,74 @@ function formatMoney(amount: number): string {
   }).format(amount);
 }
 
-function getQueryForPreset(preset: string): string {
+function toIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  return `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** Inclusive date range for GET /revenue-transactions (YYYY-MM-DD). */
+function presetToDateRange(preset: string): { from: string; until: string } {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
+  const until = toIsoDate(now);
 
   if (preset === "all") {
-    return "";
+    // Bounded default: avoid unbounded day iteration in the query Lambda.
+    return { from: "2018-01-01", until };
   }
   if (preset === "thisYear") {
-    return `year=${year}`;
+    return { from: `${year}-01-01`, until };
   }
   if (preset === "last12") {
     const from = new Date(year, month - 11, 1);
-    const fromStr = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}`;
-    const toStr = `${year}-${String(month + 1).padStart(2, "0")}`;
-    return `from=${fromStr}&to=${toStr}`;
+    return { from: toIsoDate(from), until };
   }
-  return `year=${preset}`;
+  if (/^\d{4}$/.test(preset)) {
+    const y = parseInt(preset, 10);
+    return { from: `${y}-01-01`, until: `${y}-12-31` };
+  }
+  return { from: `${year}-01-01`, until };
+}
+
+/** CSV Date column MM/DD/YYYY → calendar month key YYYY-MM. */
+function parseTxMonthPeriod(dateStr: string): string | null {
+  const m = String(dateStr).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const mm = parseInt(m[1], 10);
+  const yyyy = parseInt(m[3], 10);
+  if (mm < 1 || mm > 12) return null;
+  return `${yyyy}-${String(mm).padStart(2, "0")}`;
+}
+
+function aggregateTransactionsToRevenue(transactions: RevenueTx[]): RevenueResponse {
+  const byMonthMap = new Map<string, number>();
+  for (const t of transactions) {
+    const period = parseTxMonthPeriod(String(t.date));
+    if (!period) continue;
+    const amt = Number(t.amountTotal) || 0;
+    byMonthMap.set(period, (byMonthMap.get(period) ?? 0) + amt);
+  }
+  const byMonth: MonthEntry[] = Array.from(byMonthMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([period, sumDollars]) => ({
+      period,
+      revenueCents: Math.round(sumDollars * 100),
+      currency: "usd",
+    }));
+
+  const byYearMap = new Map<string, number>();
+  for (const m of byMonth) {
+    const y = m.period.slice(0, 4);
+    byYearMap.set(y, (byYearMap.get(y) ?? 0) + m.revenueCents);
+  }
+  const byYear: YearEntry[] = Array.from(byYearMap.entries())
+    .map(([period, revenueCents]) => ({ period, revenueCents }))
+    .sort((a, b) => a.period.localeCompare(b.period));
+
+  return { byMonth, byYear };
 }
 
 function readFirstLine(text: string): string {
@@ -163,17 +212,22 @@ export default function RevenueView() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [customerFilter, setCustomerFilter] = useState<"all" | number>("all");
   const [txLoadedOnce, setTxLoadedOnce] = useState(false);
+  const [revenueTab, setRevenueTab] = useState<"reports" | "upload">("reports");
 
-  const fetchRevenue = useCallback(async (query: string) => {
+  const fetchRevenue = useCallback(async (presetValue: string) => {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch(`/api/revenue?${query}`);
+      const { from, until } = presetToDateRange(presetValue);
+      const params = new URLSearchParams({ from, until });
+      const res = await fetch(`/api/revenue-transactions?${params.toString()}`);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? "Failed to load revenue data");
       }
-      const json: RevenueResponse = await res.json();
+      const body = await res.json().catch(() => ({}));
+      const list = (body.transactions ?? []) as RevenueTx[];
+      const json = aggregateTransactionsToRevenue(Array.isArray(list) ? list : []);
       setData(json);
 
       const years = [...new Set(json.byMonth.map((m) => m.period.slice(0, 4)))].sort(
@@ -189,8 +243,7 @@ export default function RevenueView() {
   }, []);
 
   useEffect(() => {
-    const query = getQueryForPreset(preset);
-    fetchRevenue(query);
+    void fetchRevenue(preset);
   }, [preset, fetchRevenue]);
 
   const handlePresetChange = (value: string) => {
@@ -302,6 +355,72 @@ export default function RevenueView() {
           Revenue
         </h2>
 
+        <div
+          className="flex rounded-xl border border-gray-200 overflow-hidden mb-6 w-full sm:w-fit"
+          role="tablist"
+          aria-label="Revenue sections"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={revenueTab === "reports"}
+            onClick={() => setRevenueTab("reports")}
+            className={`px-4 py-2.5 text-sm font-medium sm:min-w-[10rem] ${
+              revenueTab === "reports"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            Revenue Reports
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={revenueTab === "upload"}
+            onClick={() => setRevenueTab("upload")}
+            className={`px-4 py-2.5 text-sm font-medium sm:min-w-[10rem] border-l border-gray-200 ${
+              revenueTab === "upload"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            Upload revenue data
+          </button>
+        </div>
+
+        {revenueTab === "upload" && (
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600">
+              CSV must include columns: Date (MM/DD/YYYY), From, Amount (total).
+            </p>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Choose file
+            </label>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              disabled={uploadBusy}
+              className="block w-full max-w-lg text-sm text-gray-700 file:mr-3 file:rounded-lg file:border file:border-gray-300 file:bg-gray-50 file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-gray-100"
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                void onUploadFile(f);
+                e.target.value = "";
+              }}
+            />
+            {uploadBusy && (
+              <p className="mt-2 text-sm text-gray-500">Uploading…</p>
+            )}
+            {uploadError && (
+              <p className="mt-2 text-sm text-red-600">{uploadError}</p>
+            )}
+            {uploadMessage && !uploadError && (
+              <p className="mt-2 text-sm text-green-700">{uploadMessage}</p>
+            )}
+          </div>
+        )}
+
+        {revenueTab === "reports" && (
+          <>
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <label htmlFor="revenue-preset" className="text-sm font-medium text-gray-700">
             Period
@@ -426,42 +545,14 @@ export default function RevenueView() {
             </table>
           </div>
         )}
-      </div>
 
-      <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50 p-4 sm:p-6">
-        <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1">
-          Uploaded revenue (CSV)
+        <div className="border-t border-gray-200 pt-6 mt-2">
+        <h3 className="text-base font-semibold text-gray-900 mb-3">
+          Transaction detail
         </h3>
         <p className="text-sm text-gray-600 mb-4">
-          CSV must include columns: Date (MM/DD/YYYY), From, Amount (total).
+          Load uploaded CSV data for a date range. Totals above use the same source aggregated by month or year.
         </p>
-
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Upload revenue data
-          </label>
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            disabled={uploadBusy}
-            className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-lg file:border file:border-gray-300 file:bg-gray-50 file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-gray-100"
-            onChange={(e) => {
-              const f = e.target.files?.[0] ?? null;
-              void onUploadFile(f);
-              e.target.value = "";
-            }}
-          />
-          {uploadBusy && (
-            <p className="mt-2 text-sm text-gray-500">Uploading…</p>
-          )}
-          {uploadError && (
-            <p className="mt-2 text-sm text-red-600">{uploadError}</p>
-          )}
-          {uploadMessage && !uploadError && (
-            <p className="mt-2 text-sm text-green-700">{uploadMessage}</p>
-          )}
-        </div>
-
         <div className="flex flex-wrap items-end gap-3 mb-4">
           <div>
             <label htmlFor="tx-from" className="block text-xs font-medium text-gray-600 mb-1">
@@ -619,6 +710,9 @@ export default function RevenueView() {
               ? "No transactions in this date range."
               : "Load a date range to see uploaded transactions."}
           </p>
+        )}
+        </div>
+          </>
         )}
       </div>
     </div>
