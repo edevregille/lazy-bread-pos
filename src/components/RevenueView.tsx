@@ -529,6 +529,32 @@ export default function RevenueView() {
           </div>
         </div>
 
+        <div className="mb-4 max-w-lg">
+          <label
+            htmlFor="tx-type-filter"
+            className="block text-xs font-medium text-gray-600 mb-1"
+          >
+            Type
+          </label>
+          <select
+            id="tx-type-filter"
+            value={txTypeFilter}
+            onChange={(e) => setTxTypeFilter(e.target.value)}
+            disabled={txLoading}
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 sm:max-w-xs"
+          >
+            <option value="all">All types</option>
+            {distinctTypesInRange.map((t) => (
+              <option key={t} value={t}>
+                {formatTypeFilterLabel(t)}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-500">
+            Applies to transaction detail after you load a date range below.
+          </p>
+        </div>
+
         {loading && (
           <p className="text-gray-500">Loading revenue data…</p>
         )}
@@ -612,9 +638,9 @@ export default function RevenueView() {
           Transaction detail
         </h3>
         <p className="text-sm text-gray-600 mb-4">
-          Load uploaded CSV data for a date range. Filter by{" "}
-          <span className="font-medium">Type</span> using the types present in this range.
-          Totals above use the same source aggregated by month or year.
+          Load uploaded CSV data for a date range. Use the{" "}
+          <span className="font-medium">Type</span> control above to narrow
+          loaded transactions. Totals above use the same source aggregated by month or year.
         </p>
         <div className="flex flex-wrap items-end gap-3 mb-4">
           <div>
@@ -640,28 +666,6 @@ export default function RevenueView() {
               onChange={(e) => setTxUntil(e.target.value)}
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
-          </div>
-          <div>
-            <label
-              htmlFor="tx-type-filter"
-              className="block text-xs font-medium text-gray-600 mb-1"
-            >
-              Type
-            </label>
-            <select
-              id="tx-type-filter"
-              value={txTypeFilter}
-              onChange={(e) => setTxTypeFilter(e.target.value)}
-              disabled={txLoading}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[10.5rem] disabled:opacity-50"
-            >
-              <option value="all">All types</option>
-              {distinctTypesInRange.map((t) => (
-                <option key={t} value={t}>
-                  {formatTypeFilterLabel(t)}
-                </option>
-              ))}
-            </select>
           </div>
           <button
             type="button"
