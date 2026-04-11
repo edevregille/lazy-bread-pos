@@ -44,15 +44,16 @@ const PRESETS = [
 
 const THRESHOLD_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
-function normalizeTxType(t: RevenueTx): "bread-stand" | "market" | "online" {
+function normalizeTxType(t: RevenueTx): "bread-stand" | "market" | "online" | "in-person"
+ {
   const v = String(t.type ?? "").trim().toLowerCase();
-  if (v === "market" || v === "online") return v;
+  if (v === "market" || v === "online" || v === "in-person") return v;
   return "bread-stand";
 }
 
 function formatTypeFilterLabel(type: string): string {
   if (type === "bread-stand") return "Bread stand";
-  if (type === "market") return "Market";
+  if (type === "market" || type === "in-person") return "Market";
   if (type === "online") return "Online";
   return type;
 }

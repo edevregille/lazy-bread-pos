@@ -102,15 +102,25 @@ export function createdUtcToMmddyyyy(s: string): string | null {
   return `${String(mo).padStart(2, "0")}/${String(d).padStart(2, "0")}/${y}`;
 }
 
-/** Maps Stripe `payment_metadata[orderType]` to stored revenue type. Empty → bread-stand (in-person). */
-export function mapStripeOrderTypeToRevenueType(raw: string | undefined): RevenueType {
-  const s = String(raw ?? "")
-    .trim()
-    .toLowerCase();
-  if (!s) return "bread-stand";
+/**
+ * Maps Stripe `payment_metadata[orderType]` to stored revenue type.
+ * `null`, empty, or CSV literal "null" → in-person (stored as bread-stand).
+ */
+export function mapStripeOrderTypeToRevenueType(
+  raw: string | undefined | null
+): RevenueType {
+  if (raw === null || raw === undefined) {
+    return "bread-stand";
+  }
+  const s = String(raw).trim().toLowerCase();
+  if (!s || s === "null" || s === "undefined") {
+    return "bread-stand";
+  }
   if (s === "market") return "market";
   if (s === "online") return "online";
-  if (s === "in-person" || s === "in person" || s === "inperson") return "bread-stand";
+  if (s === "in-person" || s === "in person" || s === "inperson") {
+    return "bread-stand";
+  }
   return "bread-stand";
 }
 
@@ -180,8 +190,16 @@ export function transformStripeToCanonical(
     const gross = String(r[idxGross] ?? "").trim();
     const nameRaw = idxName >= 0 ? String(r[idxName] ?? "").trim() : "";
     const from = nameRaw || "Unknown";
-    const orderTypeRaw =
-      idxOrderType >= 0 ? String(r[idxOrderType] ?? "").trim() : "";
+    let orderTypeRaw: string | null | undefined;
+    if (idxOrderType < 0) {
+      orderTypeRaw = null;
+    } else {
+      const cell = r[idxOrderType];
+      orderTypeRaw =
+        cell === undefined || cell === null || String(cell).trim() === ""
+          ? null
+          : String(cell);
+    }
     const type = mapStripeOrderTypeToRevenueType(orderTypeRaw);
     outRows.push([date, from, gross, type]);
   }
