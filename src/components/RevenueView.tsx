@@ -10,11 +10,14 @@ type MonthEntry = {
   period: string;
   revenueCents: number;
   currency: string;
+  /** Revenue in cents per normalized transaction type */
+  byTypeCents?: Record<string, number>;
 };
 
 type YearEntry = {
   period: string;
   revenueCents: number;
+  byTypeCents?: Record<string, number>;
 };
 
 type RevenueResponse = {
@@ -175,31 +178,167 @@ function parseTxMonthPeriod(dateStr: string): string | null {
 }
 
 function aggregateTransactionsToRevenue(transactions: RevenueTx[]): RevenueResponse {
-  const byMonthMap = new Map<string, number>();
+  const byMonthMap = new Map<string, { totalCents: number; byType: Map<string, number> }>();
   for (const t of transactions) {
     const period = parseTxMonthPeriod(String(t.date));
     if (!period) continue;
     const amt = Number(t.amountTotal) || 0;
-    byMonthMap.set(period, (byMonthMap.get(period) ?? 0) + amt);
+    const cents = Math.round(amt * 100);
+    const ty = normalizeTxType(t);
+    let row = byMonthMap.get(period);
+    if (!row) {
+      row = { totalCents: 0, byType: new Map() };
+      byMonthMap.set(period, row);
+    }
+    row.totalCents += cents;
+    row.byType.set(ty, (row.byType.get(ty) ?? 0) + cents);
   }
   const byMonth: MonthEntry[] = Array.from(byMonthMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([period, sumDollars]) => ({
+    .map(([period, v]) => ({
       period,
-      revenueCents: Math.round(sumDollars * 100),
+      revenueCents: v.totalCents,
       currency: "usd",
+      byTypeCents: Object.fromEntries(v.byType) as Record<string, number>,
     }));
 
-  const byYearMap = new Map<string, number>();
+  const byYearMap = new Map<string, { totalCents: number; byType: Map<string, number> }>();
   for (const m of byMonth) {
     const y = m.period.slice(0, 4);
-    byYearMap.set(y, (byYearMap.get(y) ?? 0) + m.revenueCents);
+    let row = byYearMap.get(y);
+    if (!row) {
+      row = { totalCents: 0, byType: new Map() };
+      byYearMap.set(y, row);
+    }
+    row.totalCents += m.revenueCents;
+    if (m.byTypeCents) {
+      for (const [k, cents] of Object.entries(m.byTypeCents)) {
+        row.byType.set(k, (row.byType.get(k) ?? 0) + cents);
+      }
+    }
   }
   const byYear: YearEntry[] = Array.from(byYearMap.entries())
-    .map(([period, revenueCents]) => ({ period, revenueCents }))
+    .map(([period, v]) => ({
+      period,
+      revenueCents: v.totalCents,
+      byTypeCents: Object.fromEntries(v.byType) as Record<string, number>,
+    }))
     .sort((a, b) => a.period.localeCompare(b.period));
 
   return { byMonth, byYear };
+}
+
+function typeBarSegmentBg(type: string): string {
+  switch (type) {
+    case "bread-stand":
+      return "bg-amber-400";
+    case "market":
+    case "in-person":
+      return "bg-emerald-500";
+    case "online":
+      return "bg-violet-500";
+    default:
+      return "bg-gray-400";
+  }
+}
+
+type RevenueChartRow = {
+  period: string;
+  revenueCents: number;
+  byTypeCents?: Record<string, number>;
+};
+
+function RevenueStackedBarChart({
+  rows,
+  xLabel,
+}: {
+  rows: RevenueChartRow[];
+  xLabel: string;
+}) {
+  if (rows.length === 0) return null;
+  const maxBar = Math.max(...rows.map((r) => r.revenueCents), 1);
+  const allTypes = new Set<string>();
+  for (const r of rows) {
+    if (r.byTypeCents) {
+      for (const [k, v] of Object.entries(r.byTypeCents)) {
+        if (v > 0) allTypes.add(k);
+      }
+    }
+  }
+  const legendTypes = [...allTypes].sort(compareTypeKeys);
+
+  return (
+    <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <p className="mb-3 text-sm font-medium text-gray-800">
+        Revenue by {xLabel} (stacked by type)
+      </p>
+      <div className="flex min-h-[13rem] flex-wrap items-end justify-start gap-2 overflow-x-auto pb-2 pt-1">
+        {rows.map((row) => {
+          const rowTypes =
+            row.revenueCents <= 0
+              ? []
+              : Object.entries(row.byTypeCents ?? {})
+                  .filter(([, c]) => c > 0)
+                  .sort(([a], [b]) => compareTypeKeys(a, b))
+                  .map(([t]) => t);
+          const barHeightPct = (row.revenueCents / maxBar) * 100;
+          return (
+            <div
+              key={row.period}
+              className="flex min-w-[2.75rem] flex-col items-center gap-1"
+            >
+              <div className="flex h-52 w-10 flex-col justify-end sm:w-11">
+                <div
+                  className="flex w-full min-h-0 flex-col-reverse overflow-hidden rounded-t shadow-inner ring-1 ring-gray-200/80"
+                  style={{ height: `${barHeightPct}%` }}
+                  title={formatCurrency(row.revenueCents)}
+                >
+                  {rowTypes.length === 0 && row.revenueCents > 0 ? (
+                    <div
+                      className="h-full w-full bg-gray-300"
+                      title={formatCurrency(row.revenueCents)}
+                    />
+                  ) : (
+                    rowTypes.map((ty) => {
+                      const c = row.byTypeCents?.[ty] ?? 0;
+                      const pct =
+                        row.revenueCents > 0 ? (c / row.revenueCents) * 100 : 0;
+                      return (
+                        <div
+                          key={ty}
+                          className={`min-h-[2px] w-full shrink-0 ${typeBarSegmentBg(ty)}`}
+                          style={{ height: `${pct}%` }}
+                          title={`${formatTypeFilterLabel(ty)}: ${formatCurrency(c)}`}
+                        />
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+              <span
+                className="max-w-[4.5rem] text-center text-[10px] leading-tight text-gray-600 sm:text-xs"
+                title={row.period}
+              >
+                {row.period}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {legendTypes.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-gray-100 pt-3 text-xs text-gray-600">
+          {legendTypes.map((ty) => (
+            <span key={ty} className="inline-flex items-center gap-1.5">
+              <span
+                className={`h-2.5 w-2.5 shrink-0 rounded-sm ${typeBarSegmentBg(ty)}`}
+              />
+              {formatTypeFilterLabel(ty)}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function defaultFromUntil(): { from: string; until: string } {
@@ -272,7 +411,9 @@ export default function RevenueView() {
   const [customerFilter, setCustomerFilter] = useState<"all" | number>("all");
   const [txTypeFilter, setTxTypeFilter] = useState<string>("all");
   const [txLoadedOnce, setTxLoadedOnce] = useState(false);
-  const [revenueTab, setRevenueTab] = useState<"reports" | "upload">("reports");
+  const [revenueTab, setRevenueTab] = useState<"reports" | "detail" | "upload">(
+    "reports"
+  );
 
   const fetchRevenue = useCallback(async (presetValue: string) => {
     try {
@@ -461,6 +602,19 @@ export default function RevenueView() {
           <button
             type="button"
             role="tab"
+            aria-selected={revenueTab === "detail"}
+            onClick={() => setRevenueTab("detail")}
+            className={`px-4 py-2.5 text-sm font-medium sm:min-w-[10rem] border-l border-gray-200 ${
+              revenueTab === "detail"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            Transaction detail
+          </button>
+          <button
+            type="button"
+            role="tab"
             aria-selected={revenueTab === "upload"}
             onClick={() => setRevenueTab("upload")}
             className={`px-4 py-2.5 text-sm font-medium sm:min-w-[10rem] border-l border-gray-200 ${
@@ -602,6 +756,8 @@ export default function RevenueView() {
         )}
 
         {!loading && !error && data && viewMode === "month" && (
+          <>
+          <RevenueStackedBarChart rows={data.byMonth} xLabel="month" />
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead>
@@ -634,9 +790,12 @@ export default function RevenueView() {
               </tbody>
             </table>
           </div>
+          </>
         )}
 
         {!loading && !error && data && viewMode === "year" && (
+          <>
+          <RevenueStackedBarChart rows={data.byYear} xLabel="year" />
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead>
@@ -669,16 +828,21 @@ export default function RevenueView() {
               </tbody>
             </table>
           </div>
+          </>
         )}
 
-        <div className="border-t border-gray-200 pt-6 mt-2">
-        <h3 className="text-base font-semibold text-gray-900 mb-3">
+        </>
+        )}
+
+        {revenueTab === "detail" && (
+        <div className="space-y-4">
+        <h3 className="text-base font-semibold text-gray-900 mb-1">
           Transaction detail
         </h3>
         <p className="text-sm text-gray-600 mb-4">
           Load uploaded CSV data for a date range. Use{" "}
           <span className="font-medium">Type</span> under the date fields to narrow
-          loaded transactions. Totals above use the same source aggregated by month or year.
+          loaded transactions. Same underlying data as Revenue Reports (aggregated by month or year there).
         </p>
         <div className="flex flex-wrap items-end gap-3 mb-3">
           <div>
@@ -901,7 +1065,6 @@ export default function RevenueView() {
           </p>
         )}
         </div>
-          </>
         )}
       </div>
     </div>
