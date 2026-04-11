@@ -47,7 +47,21 @@ const UPLOAD_TYPE_OPTIONS = [
   { value: "online", label: "Online" },
 ] as const;
 
+/** Transaction detail tab: filter loaded rows by stored type (legacy rows without type = bread stand). */
+const TX_DETAIL_TYPE_FILTER_OPTIONS = [
+  { value: "all", label: "All types" },
+  { value: "bread-stand", label: "Bread stand" },
+  { value: "market", label: "Market" },
+  { value: "online", label: "Online" },
+] as const;
+
 const THRESHOLD_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+
+function normalizeTxType(t: RevenueTx): "bread-stand" | "market" | "online" {
+  const v = String(t.type ?? "").trim().toLowerCase();
+  if (v === "market" || v === "online") return v;
+  return "bread-stand";
+}
 
 function formatCurrency(cents: number, currency: string = "usd"): string {
   const value = cents / 100;
@@ -248,6 +262,9 @@ export default function RevenueView() {
   const [uploadTransactionType, setUploadTransactionType] =
     useState<string>("bread-stand");
   const [customerFilter, setCustomerFilter] = useState<"all" | number>("all");
+  const [txTypeFilter, setTxTypeFilter] = useState<
+    "all" | "bread-stand" | "market" | "online"
+  >("all");
   const [txLoadedOnce, setTxLoadedOnce] = useState(false);
   const [revenueTab, setRevenueTab] = useState<"reports" | "upload">("reports");
 
@@ -287,11 +304,19 @@ export default function RevenueView() {
     setPreset(value);
   };
 
-  const customerCounts = useMemo(() => countByCustomer(transactions), [transactions]);
+  const transactionsForDetail = useMemo(() => {
+    if (txTypeFilter === "all") return transactions;
+    return transactions.filter((t) => normalizeTxType(t) === txTypeFilter);
+  }, [transactions, txTypeFilter]);
+
+  const customerCounts = useMemo(
+    () => countByCustomer(transactionsForDetail),
+    [transactionsForDetail]
+  );
 
   const customerRows = useMemo(
-    () => aggregateCustomersByFrom(transactions),
-    [transactions]
+    () => aggregateCustomersByFrom(transactionsForDetail),
+    [transactionsForDetail]
   );
 
   const displayedCustomerRows = useMemo(() => {
@@ -301,8 +326,9 @@ export default function RevenueView() {
   }, [customerRows, customerFilter]);
 
   const txTotalRevenue = useMemo(
-    () => transactions.reduce((s, t) => s + (Number(t.amountTotal) || 0), 0),
-    [transactions]
+    () =>
+      transactionsForDetail.reduce((s, t) => s + (Number(t.amountTotal) || 0), 0),
+    [transactionsForDetail]
   );
 
   const loadTransactions = async () => {
@@ -612,7 +638,9 @@ export default function RevenueView() {
           Transaction detail
         </h3>
         <p className="text-sm text-gray-600 mb-4">
-          Load uploaded CSV data for a date range. Totals above use the same source aggregated by month or year.
+          Load uploaded CSV data for a date range. Use <span className="font-medium">Type</span>{" "}
+          to show all channels or only bread stand, market, or online. Totals above use the same
+          source aggregated by month or year.
         </p>
         <div className="flex flex-wrap items-end gap-3 mb-4">
           <div>
@@ -639,6 +667,31 @@ export default function RevenueView() {
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
+          <div>
+            <label
+              htmlFor="tx-type-filter"
+              className="block text-xs font-medium text-gray-600 mb-1"
+            >
+              Type
+            </label>
+            <select
+              id="tx-type-filter"
+              value={txTypeFilter}
+              onChange={(e) =>
+                setTxTypeFilter(
+                  e.target.value as "all" | "bread-stand" | "market" | "online"
+                )
+              }
+              disabled={txLoading}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[10.5rem] disabled:opacity-50"
+            >
+              {TX_DETAIL_TYPE_FILTER_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <button
             type="button"
             onClick={() => void loadTransactions()}
@@ -655,6 +708,12 @@ export default function RevenueView() {
 
         {transactions.length > 0 && (
           <div className="space-y-4 mb-6">
+            {transactionsForDetail.length === 0 && (
+              <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                No transactions match the selected type for this date range. Choose
+                &quot;All types&quot; or pick another type.
+              </p>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div className="rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2">
                 <div className="text-xs text-gray-500">Total revenue</div>
@@ -665,7 +724,7 @@ export default function RevenueView() {
               <div className="rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2">
                 <div className="text-xs text-gray-500">Transactions</div>
                 <div className="text-lg font-semibold text-gray-900">
-                  {transactions.length}
+                  {transactionsForDetail.length}
                 </div>
               </div>
               <div className="rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2">
@@ -693,7 +752,7 @@ export default function RevenueView() {
                   All customers
                 </button>
                 {THRESHOLD_LEVELS.map((n) => {
-                  const cnt = customersWithMoreThanN(transactions, n);
+                  const cnt = customersWithMoreThanN(transactionsForDetail, n);
                   const active = customerFilter === n;
                   return (
                     <button
@@ -715,11 +774,14 @@ export default function RevenueView() {
           </div>
         )}
 
-        {transactions.length > 0 && (
+        {transactions.length > 0 && transactionsForDetail.length > 0 && (
           <div className="overflow-x-auto">
             <h4 className="text-sm font-semibold text-gray-900 mb-2">Customers</h4>
             <p className="text-xs text-gray-500 mb-2">
               Showing {displayedCustomerRows.length} of {customerRows.length} customer(s)
+              {txTypeFilter !== "all"
+                ? ` (${TX_DETAIL_TYPE_FILTER_OPTIONS.find((o) => o.value === txTypeFilter)?.label ?? txTypeFilter} only)`
+                : ""}
               {customerFilter !== "all"
                 ? ` (with &gt; ${customerFilter} transaction(s) in range)`
                 : ""}
