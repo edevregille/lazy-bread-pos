@@ -25,6 +25,12 @@ type RevenueTx = {
   [key: string]: unknown;
 };
 
+type CustomerRow = {
+  from: string;
+  transactionCount: number;
+  totalRevenue: number;
+};
+
 const PRESETS = [
   { id: "last12", label: "Last 12 months" },
   { id: "thisYear", label: "This year" },
@@ -193,6 +199,27 @@ function customersWithMoreThanN(transactions: RevenueTx[], n: number): number {
   return c;
 }
 
+function aggregateCustomersByFrom(transactions: RevenueTx[]): CustomerRow[] {
+  const m = new Map<string, { count: number; total: number }>();
+  for (const t of transactions) {
+    const key = String(t.from);
+    const prev = m.get(key) ?? { count: 0, total: 0 };
+    prev.count += 1;
+    prev.total += Number(t.amountTotal) || 0;
+    m.set(key, prev);
+  }
+  return Array.from(m.entries())
+    .map(([from, v]) => ({
+      from,
+      transactionCount: v.count,
+      totalRevenue: v.total,
+    }))
+    .sort(
+      (a, b) =>
+        b.totalRevenue - a.totalRevenue || a.from.localeCompare(b.from)
+    );
+}
+
 export default function RevenueView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -252,27 +279,21 @@ export default function RevenueView() {
 
   const customerCounts = useMemo(() => countByCustomer(transactions), [transactions]);
 
-  const displayedTransactions = useMemo(() => {
-    if (customerFilter === "all") return transactions;
+  const customerRows = useMemo(
+    () => aggregateCustomersByFrom(transactions),
+    [transactions]
+  );
+
+  const displayedCustomerRows = useMemo(() => {
+    if (customerFilter === "all") return customerRows;
     const n = customerFilter;
-    return transactions.filter((t) => (customerCounts.get(String(t.from)) ?? 0) > n);
-  }, [transactions, customerFilter, customerCounts]);
+    return customerRows.filter((r) => r.transactionCount > n);
+  }, [customerRows, customerFilter]);
 
   const txTotalRevenue = useMemo(
     () => transactions.reduce((s, t) => s + (Number(t.amountTotal) || 0), 0),
     [transactions]
   );
-
-  const extraColumnKeys = useMemo(() => {
-    const skip = new Set(["date", "from", "amountTotal"]);
-    const keys = new Set<string>();
-    for (const row of transactions) {
-      for (const k of Object.keys(row)) {
-        if (!skip.has(k)) keys.add(k);
-      }
-    }
-    return Array.from(keys).sort();
-  }, [transactions]);
 
   const loadTransactions = async () => {
     if (!txFrom) {
@@ -617,7 +638,7 @@ export default function RevenueView() {
 
             <div>
               <div className="text-xs font-medium text-gray-600 mb-2">
-                Customers by transaction count (click to filter table)
+                Customers by transaction count (click to filter list)
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -629,7 +650,7 @@ export default function RevenueView() {
                       : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                   }`}
                 >
-                  All transactions
+                  All customers
                 </button>
                 {THRESHOLD_LEVELS.map((n) => {
                   const cnt = customersWithMoreThanN(transactions, n);
@@ -656,46 +677,38 @@ export default function RevenueView() {
 
         {transactions.length > 0 && (
           <div className="overflow-x-auto">
+            <h4 className="text-sm font-semibold text-gray-900 mb-2">Customers</h4>
             <p className="text-xs text-gray-500 mb-2">
-              Showing {displayedTransactions.length} of {transactions.length} transaction(s)
-              {customerFilter !== "all" ? ` (customers with &gt; ${customerFilter} transaction(s) in range)` : ""}
+              Showing {displayedCustomerRows.length} of {customerRows.length} customer(s)
+              {customerFilter !== "all"
+                ? ` (with &gt; ${customerFilter} transaction(s) in range)`
+                : ""}
             </p>
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead>
                 <tr>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-700">Date</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-700">From</th>
-                  <th className="px-3 py-2 text-right font-semibold text-gray-700">Amount (total)</th>
-                  {extraColumnKeys.map((k) => (
-                    <th key={k} className="px-3 py-2 text-left font-semibold text-gray-700">
-                      {k}
-                    </th>
-                  ))}
+                  <th className="px-3 py-2 text-left font-semibold text-gray-700">Customer</th>
+                  <th className="px-3 py-2 text-right font-semibold text-gray-700">Transactions</th>
+                  <th className="px-3 py-2 text-right font-semibold text-gray-700">Total revenue</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {displayedTransactions.length === 0 ? (
+                {displayedCustomerRows.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={3 + extraColumnKeys.length}
-                      className="px-3 py-4 text-gray-500"
-                    >
-                      No rows match this filter.
+                    <td colSpan={3} className="px-3 py-4 text-gray-500">
+                      No customers match this filter.
                     </td>
                   </tr>
                 ) : (
-                  displayedTransactions.map((row, idx) => (
-                    <tr key={`${row.date}-${row.from}-${idx}`} className="hover:bg-gray-50/50">
-                      <td className="px-3 py-2 text-gray-900">{String(row.date)}</td>
-                      <td className="px-3 py-2 text-gray-900">{String(row.from)}</td>
-                      <td className="px-3 py-2 text-right text-gray-900">
-                        {formatMoney(Number(row.amountTotal) || 0)}
+                  displayedCustomerRows.map((row) => (
+                    <tr key={row.from} className="hover:bg-gray-50/50">
+                      <td className="px-3 py-2 text-gray-900">{row.from}</td>
+                      <td className="px-3 py-2 text-right text-gray-900 tabular-nums">
+                        {row.transactionCount}
                       </td>
-                      {extraColumnKeys.map((k) => (
-                        <td key={k} className="px-3 py-2 text-gray-800">
-                          {row[k] != null ? String(row[k]) : ""}
-                        </td>
-                      ))}
+                      <td className="px-3 py-2 text-right text-gray-900 tabular-nums">
+                        {formatMoney(row.totalRevenue)}
+                      </td>
                     </tr>
                   ))
                 )}
