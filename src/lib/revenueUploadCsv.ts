@@ -119,7 +119,7 @@ export function mapStripeOrderTypeToRevenueType(
   if (s === "market") return "market";
   if (s === "online") return "online";
   if (s === "in-person" || s === "in person" || s === "inperson") {
-    return "bread-stand";
+    return "market";
   }
   return "bread-stand";
 }
