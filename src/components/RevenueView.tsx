@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 
 type MonthEntry = {
   period: string;
@@ -19,11 +19,22 @@ type RevenueResponse = {
   byYear: YearEntry[];
 };
 
+type RevenueTx = {
+  date: string;
+  from: string;
+  amountTotal: number;
+  [key: string]: unknown;
+};
+
 const PRESETS = [
   { id: "last12", label: "Last 12 months" },
   { id: "thisYear", label: "This year" },
   { id: "all", label: "All time" },
 ] as const;
+
+const REQUIRED_CSV_HEADERS = ["Date", "From", "Amount (total)"] as const;
+
+const THRESHOLD_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 function formatCurrency(cents: number, currency: string = "usd"): string {
   const value = cents / 100;
@@ -31,6 +42,13 @@ function formatCurrency(cents: number, currency: string = "usd"): string {
     style: "currency",
     currency: currency.toUpperCase(),
   }).format(value);
+}
+
+function formatMoney(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(amount);
 }
 
 function getQueryForPreset(preset: string): string {
@@ -53,6 +71,79 @@ function getQueryForPreset(preset: string): string {
   return `year=${preset}`;
 }
 
+function readFirstLine(text: string): string {
+  const normalized = text.replace(/^\uFEFF/, "");
+  const nl = normalized.indexOf("\n");
+  const line = nl === -1 ? normalized : normalized.slice(0, nl);
+  return line.replace(/\r$/, "");
+}
+
+/** Minimal CSV header parse (handles quoted fields). */
+function parseCsvHeaderRow(line: string): string[] {
+  const out: string[] = [];
+  let field = "";
+  let i = 0;
+  let inQuotes = false;
+  const s = line.replace(/^\uFEFF/, "");
+  while (i < s.length) {
+    const c = s[i];
+    if (c === '"') {
+      inQuotes = !inQuotes;
+      i++;
+      continue;
+    }
+    if (!inQuotes && c === ",") {
+      out.push(field.trim());
+      field = "";
+      i++;
+      continue;
+    }
+    if (!inQuotes && (c === "\n" || c === "\r")) break;
+    field += c;
+    i++;
+  }
+  out.push(field.trim());
+  return out.map((h) => h.replace(/^"|"$/g, ""));
+}
+
+function validateCsvHeaders(headerLine: string): string | null {
+  const cols = parseCsvHeaderRow(headerLine);
+  for (const req of REQUIRED_CSV_HEADERS) {
+    if (!cols.includes(req)) {
+      return `CSV must include columns: ${REQUIRED_CSV_HEADERS.join(", ")}. Found: ${cols.join(", ")}`;
+    }
+  }
+  return null;
+}
+
+function defaultFromUntil(): { from: string; until: string } {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth() + 1;
+  const d = now.getDate();
+  const until = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const from = `${y}-${String(m).padStart(2, "0")}-01`;
+  return { from, until };
+}
+
+function countByCustomer(transactions: RevenueTx[]): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const t of transactions) {
+    const k = String(t.from);
+    m.set(k, (m.get(k) ?? 0) + 1);
+  }
+  return m;
+}
+
+function customersWithMoreThanN(transactions: RevenueTx[], n: number): number {
+  const counts = countByCustomer(transactions);
+  let c = 0;
+  for (const v of counts.values()) {
+    if (v > n) c++;
+  }
+  return c;
+}
+
 export default function RevenueView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +151,18 @@ export default function RevenueView() {
   const [preset, setPreset] = useState<string>("thisYear");
   const [viewMode, setViewMode] = useState<"month" | "year">("month");
   const [yearOptions, setYearOptions] = useState<string[]>([]);
+
+  const defaults = useMemo(() => defaultFromUntil(), []);
+  const [txFrom, setTxFrom] = useState(defaults.from);
+  const [txUntil, setTxUntil] = useState(defaults.until);
+  const [txLoading, setTxLoading] = useState(false);
+  const [txError, setTxError] = useState<string | null>(null);
+  const [transactions, setTransactions] = useState<RevenueTx[]>([]);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [customerFilter, setCustomerFilter] = useState<"all" | number>("all");
+  const [txLoadedOnce, setTxLoadedOnce] = useState(false);
 
   const fetchRevenue = useCallback(async (query: string) => {
     try {
@@ -92,6 +195,104 @@ export default function RevenueView() {
 
   const handlePresetChange = (value: string) => {
     setPreset(value);
+  };
+
+  const customerCounts = useMemo(() => countByCustomer(transactions), [transactions]);
+
+  const displayedTransactions = useMemo(() => {
+    if (customerFilter === "all") return transactions;
+    const n = customerFilter;
+    return transactions.filter((t) => (customerCounts.get(String(t.from)) ?? 0) > n);
+  }, [transactions, customerFilter, customerCounts]);
+
+  const txTotalRevenue = useMemo(
+    () => transactions.reduce((s, t) => s + (Number(t.amountTotal) || 0), 0),
+    [transactions]
+  );
+
+  const extraColumnKeys = useMemo(() => {
+    const skip = new Set(["date", "from", "amountTotal"]);
+    const keys = new Set<string>();
+    for (const row of transactions) {
+      for (const k of Object.keys(row)) {
+        if (!skip.has(k)) keys.add(k);
+      }
+    }
+    return Array.from(keys).sort();
+  }, [transactions]);
+
+  const loadTransactions = async () => {
+    if (!txFrom) {
+      setTxError("Choose a start date");
+      return;
+    }
+    const params = new URLSearchParams({ from: txFrom });
+    if (txUntil) params.set("until", txUntil);
+    try {
+      setTxLoading(true);
+      setTxError(null);
+      setCustomerFilter("all");
+      const res = await fetch(`/api/revenue-transactions?${params.toString()}`);
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error ?? "Failed to load transactions");
+      }
+      const list = (body.transactions ?? []) as RevenueTx[];
+      setTransactions(Array.isArray(list) ? list : []);
+      setTxLoadedOnce(true);
+    } catch (e) {
+      setTxError(e instanceof Error ? e.message : "Unable to load transactions");
+      setTransactions([]);
+    } finally {
+      setTxLoading(false);
+    }
+  };
+
+  const onUploadFile = async (file: File | null) => {
+    setUploadMessage(null);
+    setUploadError(null);
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setUploadError("Please choose a CSV file.");
+      return;
+    }
+    const text = await file.text();
+    const first = readFirstLine(text);
+    const headerErr = validateCsvHeaders(first);
+    if (headerErr) {
+      setUploadError(headerErr);
+      return;
+    }
+    try {
+      setUploadBusy(true);
+      const res = await fetch("/api/revenue-transactions/upload", {
+        method: "POST",
+        headers: { "Content-Type": "text/csv; charset=utf-8" },
+        body: text,
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error ?? body.message ?? "Upload failed");
+      }
+      const parts: string[] = [];
+      if (typeof body.rowsImported === "number") {
+        parts.push(`${body.rowsImported} row(s) imported`);
+      }
+      if (typeof body.daysWritten === "number") {
+        parts.push(`${body.daysWritten} day file(s) updated`);
+      }
+      setUploadMessage(parts.length ? parts.join(" · ") : "Upload complete.");
+      if (Array.isArray(body.rowErrors) && body.rowErrors.length) {
+        setUploadMessage(
+          (parts.length ? parts.join(" · ") + ". " : "") +
+            `${body.rowErrors.length} row(s) skipped (see server logs for details).`
+        );
+      }
+    } catch (e) {
+      setUploadError(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploadBusy(false);
+    }
   };
 
   return (
@@ -224,6 +425,200 @@ export default function RevenueView() {
               </tbody>
             </table>
           </div>
+        )}
+      </div>
+
+      <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50 p-4 sm:p-6">
+        <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1">
+          Uploaded revenue (CSV)
+        </h3>
+        <p className="text-sm text-gray-600 mb-4">
+          CSV must include columns: Date (MM/DD/YYYY), From, Amount (total).
+        </p>
+
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Upload revenue data
+          </label>
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            disabled={uploadBusy}
+            className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-lg file:border file:border-gray-300 file:bg-gray-50 file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-gray-100"
+            onChange={(e) => {
+              const f = e.target.files?.[0] ?? null;
+              void onUploadFile(f);
+              e.target.value = "";
+            }}
+          />
+          {uploadBusy && (
+            <p className="mt-2 text-sm text-gray-500">Uploading…</p>
+          )}
+          {uploadError && (
+            <p className="mt-2 text-sm text-red-600">{uploadError}</p>
+          )}
+          {uploadMessage && !uploadError && (
+            <p className="mt-2 text-sm text-green-700">{uploadMessage}</p>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3 mb-4">
+          <div>
+            <label htmlFor="tx-from" className="block text-xs font-medium text-gray-600 mb-1">
+              From
+            </label>
+            <input
+              id="tx-from"
+              type="date"
+              value={txFrom}
+              onChange={(e) => setTxFrom(e.target.value)}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label htmlFor="tx-until" className="block text-xs font-medium text-gray-600 mb-1">
+              Until (optional)
+            </label>
+            <input
+              id="tx-until"
+              type="date"
+              value={txUntil}
+              onChange={(e) => setTxUntil(e.target.value)}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => void loadTransactions()}
+            disabled={txLoading}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700 disabled:opacity-50"
+          >
+            {txLoading ? "Loading…" : "Load data"}
+          </button>
+        </div>
+
+        {txError && (
+          <p className="text-red-600 text-sm font-medium mb-4">{txError}</p>
+        )}
+
+        {transactions.length > 0 && (
+          <div className="space-y-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2">
+                <div className="text-xs text-gray-500">Total revenue</div>
+                <div className="text-lg font-semibold text-gray-900">
+                  {formatMoney(txTotalRevenue)}
+                </div>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2">
+                <div className="text-xs text-gray-500">Transactions</div>
+                <div className="text-lg font-semibold text-gray-900">
+                  {transactions.length}
+                </div>
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2">
+                <div className="text-xs text-gray-500">Unique customers</div>
+                <div className="text-lg font-semibold text-gray-900">
+                  {customerCounts.size}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-medium text-gray-600 mb-2">
+                Customers by transaction count (click to filter table)
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCustomerFilter("all")}
+                  className={`rounded-full px-3 py-1 text-sm border ${
+                    customerFilter === "all"
+                      ? "border-blue-600 bg-blue-50 text-blue-900"
+                      : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  All transactions
+                </button>
+                {THRESHOLD_LEVELS.map((n) => {
+                  const cnt = customersWithMoreThanN(transactions, n);
+                  const active = customerFilter === n;
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setCustomerFilter(n)}
+                      className={`rounded-full px-3 py-1 text-sm border ${
+                        active
+                          ? "border-blue-600 bg-blue-50 text-blue-900"
+                          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      &gt; {n} tx: {cnt} customers
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {transactions.length > 0 && (
+          <div className="overflow-x-auto">
+            <p className="text-xs text-gray-500 mb-2">
+              Showing {displayedTransactions.length} of {transactions.length} transaction(s)
+              {customerFilter !== "all" ? ` (customers with &gt; ${customerFilter} transaction(s) in range)` : ""}
+            </p>
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead>
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-700">Date</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-700">From</th>
+                  <th className="px-3 py-2 text-right font-semibold text-gray-700">Amount (total)</th>
+                  {extraColumnKeys.map((k) => (
+                    <th key={k} className="px-3 py-2 text-left font-semibold text-gray-700">
+                      {k}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {displayedTransactions.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={3 + extraColumnKeys.length}
+                      className="px-3 py-4 text-gray-500"
+                    >
+                      No rows match this filter.
+                    </td>
+                  </tr>
+                ) : (
+                  displayedTransactions.map((row, idx) => (
+                    <tr key={`${row.date}-${row.from}-${idx}`} className="hover:bg-gray-50/50">
+                      <td className="px-3 py-2 text-gray-900">{String(row.date)}</td>
+                      <td className="px-3 py-2 text-gray-900">{String(row.from)}</td>
+                      <td className="px-3 py-2 text-right text-gray-900">
+                        {formatMoney(Number(row.amountTotal) || 0)}
+                      </td>
+                      {extraColumnKeys.map((k) => (
+                        <td key={k} className="px-3 py-2 text-gray-800">
+                          {row[k] != null ? String(row[k]) : ""}
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {!txLoading && transactions.length === 0 && !txError && (
+          <p className="text-sm text-gray-500">
+            {txLoadedOnce
+              ? "No transactions in this date range."
+              : "Load a date range to see uploaded transactions."}
+          </p>
         )}
       </div>
     </div>
