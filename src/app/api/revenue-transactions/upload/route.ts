@@ -13,11 +13,15 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.text();
     const contentType = req.headers.get("content-type") || "text/csv";
+    const revenueTxType = req.headers.get("x-revenue-transaction-type");
 
     const response = await fetch(`${apiGatewayUrl}/revenue-transactions`, {
       method: "POST",
       headers: {
         "Content-Type": contentType,
+        ...(revenueTxType
+          ? { "X-Revenue-Transaction-Type": revenueTxType }
+          : {}),
       },
       body,
     });

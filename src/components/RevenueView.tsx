@@ -22,6 +22,7 @@ type RevenueTx = {
   date: string;
   from: string;
   amountTotal: number;
+  type?: string;
   [key: string]: unknown;
 };
 
@@ -38,6 +39,13 @@ const PRESETS = [
 ] as const;
 
 const REQUIRED_CSV_HEADERS = ["Date", "From", "Amount (total)"] as const;
+
+/** Default for uploads when CSV has no Type column; also matches empty Type cells. */
+const UPLOAD_TYPE_OPTIONS = [
+  { value: "bread-stand", label: "Bread stand" },
+  { value: "market", label: "Market" },
+  { value: "online", label: "Online" },
+] as const;
 
 const THRESHOLD_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
@@ -237,6 +245,8 @@ export default function RevenueView() {
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadTransactionType, setUploadTransactionType] =
+    useState<string>("bread-stand");
   const [customerFilter, setCustomerFilter] = useState<"all" | number>("all");
   const [txLoadedOnce, setTxLoadedOnce] = useState(false);
   const [revenueTab, setRevenueTab] = useState<"reports" | "upload">("reports");
@@ -341,7 +351,10 @@ export default function RevenueView() {
       setUploadBusy(true);
       const res = await fetch("/api/revenue-transactions/upload", {
         method: "POST",
-        headers: { "Content-Type": "text/csv; charset=utf-8" },
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "X-Revenue-Transaction-Type": uploadTransactionType,
+        },
         body: text,
       });
       const body = await res.json().catch(() => ({}));
@@ -413,7 +426,34 @@ export default function RevenueView() {
           <div className="space-y-2">
             <p className="text-sm text-gray-600">
               CSV must include columns: Date (MM/DD/YYYY), From, Amount (total).
+              Optional column <span className="font-medium">Type</span>:{" "}
+              <code className="text-xs bg-gray-100 px-1 rounded">bread-stand</code>,{" "}
+              <code className="text-xs bg-gray-100 px-1 rounded">market</code>, or{" "}
+              <code className="text-xs bg-gray-100 px-1 rounded">online</code> — leave
+              empty for bread stand. If the file has no Type column, the selection below
+              applies to every row.
             </p>
+            <div className="max-w-lg">
+              <label
+                htmlFor="revenue-upload-type"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Transaction type (default for CSV without Type column)
+              </label>
+              <select
+                id="revenue-upload-type"
+                value={uploadTransactionType}
+                onChange={(e) => setUploadTransactionType(e.target.value)}
+                disabled={uploadBusy}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                {UPLOAD_TYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Choose file
             </label>
