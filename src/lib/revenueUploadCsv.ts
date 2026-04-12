@@ -110,18 +110,18 @@ export function mapStripeOrderTypeToRevenueType(
   raw: string | undefined | null
 ): RevenueType {
   if (raw === null || raw === undefined) {
-    return "bread-stand";
+    return "market";
   }
   const s = String(raw).trim().toLowerCase();
   if (!s || s === "null" || s === "undefined") {
-    return "bread-stand";
+    return "market";
   }
   if (s === "market") return "market";
   if (s === "online") return "online";
   if (s === "in-person" || s === "in person" || s === "inperson") {
     return "market";
   }
-  return "bread-stand";
+  return "market";
 }
 
 export function transformVenmoToCanonical(

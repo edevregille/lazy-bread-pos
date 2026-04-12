@@ -25,6 +25,25 @@ type RevenueResponse = {
   byYear: YearEntry[];
 };
 
+type MonthlySummaryByType = {
+  transactions: number;
+  revenue: number;
+  uniqueCustomers: number;
+};
+
+type MonthlySummaryMonth = {
+  byType: Partial<
+    Record<"bread-stand" | "market" | "online", MonthlySummaryByType>
+  >;
+  breadStandRetentionPct: number | null;
+};
+
+type MonthlySummaryApi = {
+  version?: number;
+  updatedAt?: string | null;
+  months: Record<string, MonthlySummaryMonth>;
+};
+
 type RevenueTx = {
   date: string;
   from: string;
@@ -248,6 +267,22 @@ type RevenueChartRow = {
   byTypeCents?: Record<string, number>;
 };
 
+function monthlySummaryToChartRows(summary: MonthlySummaryApi): RevenueChartRow[] {
+  const monthKeys = Object.keys(summary.months ?? {}).sort();
+  return monthKeys.map((period) => {
+    const m = summary.months[period];
+    const byTypeCents: Record<string, number> = {};
+    let revenueCents = 0;
+    for (const [t, v] of Object.entries(m.byType ?? {})) {
+      if (!v) continue;
+      const c = Math.round(Number(v.revenue) * 100);
+      byTypeCents[t] = c;
+      revenueCents += c;
+    }
+    return { period, revenueCents, byTypeCents };
+  });
+}
+
 function RevenueStackedBarChart({
   rows,
   xLabel,
@@ -411,9 +446,56 @@ export default function RevenueView() {
   const [customerFilter, setCustomerFilter] = useState<"all" | number>("all");
   const [txTypeFilter, setTxTypeFilter] = useState<string>("all");
   const [txLoadedOnce, setTxLoadedOnce] = useState(false);
-  const [revenueTab, setRevenueTab] = useState<"reports" | "detail" | "upload">(
-    "reports"
+  const [revenueTab, setRevenueTab] = useState<
+    "summary" | "reports" | "detail" | "manage"
+  >("summary");
+  const [monthlySummary, setMonthlySummary] = useState<MonthlySummaryApi | null>(
+    null
   );
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [deleteFrom, setDeleteFrom] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-01-01`;
+  });
+  const [deleteUntil, setDeleteUntil] = useState(() => toIsoDate(new Date()));
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const loadMonthlySummary = useCallback(async () => {
+    try {
+      setSummaryLoading(true);
+      setSummaryError(null);
+      const res = await fetch("/api/revenue-transactions/monthly-summary");
+      const body = (await res.json().catch(() => ({}))) as MonthlySummaryApi & {
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(
+          typeof body.error === "string"
+            ? body.error
+            : "Failed to load monthly summary"
+        );
+      }
+      setMonthlySummary({
+        version: body.version,
+        updatedAt: body.updatedAt ?? null,
+        months: body.months ?? {},
+      });
+    } catch (e) {
+      setSummaryError(
+        e instanceof Error ? e.message : "Unable to load monthly summary"
+      );
+      setMonthlySummary(null);
+    } finally {
+      setSummaryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (revenueTab === "summary") void loadMonthlySummary();
+  }, [revenueTab, loadMonthlySummary]);
 
   const fetchRevenue = useCallback(async (presetValue: string) => {
     try {
@@ -567,10 +649,53 @@ export default function RevenueView() {
             `${body.rowErrors.length} row(s) skipped (see server logs for details).`
         );
       }
+      void loadMonthlySummary();
     } catch (e) {
       setUploadError(e instanceof Error ? e.message : "Upload failed");
     } finally {
       setUploadBusy(false);
+    }
+  };
+
+  const onDeleteRange = async () => {
+    setDeleteMessage(null);
+    setDeleteError(null);
+    if (!deleteFrom || !deleteUntil) {
+      setDeleteError("Choose both start and end dates.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Remove all stored transactions from ${deleteFrom} through ${deleteUntil}? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    try {
+      setDeleteBusy(true);
+      const res = await fetch("/api/revenue-transactions/delete-range", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from: deleteFrom, until: deleteUntil }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          (body.error as string) ??
+            (body.message as string) ??
+            "Delete failed"
+        );
+      }
+      const n =
+        typeof body.daysDeleted === "number" ? body.daysDeleted : 0;
+      setDeleteMessage(
+        `Removed data for ${n} calendar day(s). The monthly summary was rebuilt.`
+      );
+      void loadMonthlySummary();
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Delete failed");
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -589,9 +714,22 @@ export default function RevenueView() {
           <button
             type="button"
             role="tab"
+            aria-selected={revenueTab === "summary"}
+            onClick={() => setRevenueTab("summary")}
+            className={`px-4 py-2.5 text-sm font-medium sm:min-w-[10rem] ${
+              revenueTab === "summary"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-50 text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            Monthly Summary
+          </button>
+          <button
+            type="button"
+            role="tab"
             aria-selected={revenueTab === "reports"}
             onClick={() => setRevenueTab("reports")}
-            className={`px-4 py-2.5 text-sm font-medium sm:min-w-[10rem] ${
+            className={`px-4 py-2.5 text-sm font-medium sm:min-w-[10rem] border-l border-gray-200 ${
               revenueTab === "reports"
                 ? "bg-blue-600 text-white"
                 : "bg-gray-50 text-gray-700 hover:bg-gray-100"
@@ -615,20 +753,191 @@ export default function RevenueView() {
           <button
             type="button"
             role="tab"
-            aria-selected={revenueTab === "upload"}
-            onClick={() => setRevenueTab("upload")}
+            aria-selected={revenueTab === "manage"}
+            onClick={() => setRevenueTab("manage")}
             className={`px-4 py-2.5 text-sm font-medium sm:min-w-[10rem] border-l border-gray-200 ${
-              revenueTab === "upload"
+              revenueTab === "manage"
                 ? "bg-blue-600 text-white"
                 : "bg-gray-50 text-gray-700 hover:bg-gray-100"
             }`}
           >
-            Upload revenue data
+            Manage Revenue Data
           </button>
         </div>
 
-        {revenueTab === "upload" && (
-          <div className="space-y-2">
+        {revenueTab === "summary" && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Per-month metrics from stored transactions: revenue and counts by type (bread-stand,
+              market, online), bread-stand unique customers, and bread-stand retention vs. the
+              prior month.
+            </p>
+            {summaryLoading && (
+              <p className="text-gray-500">Loading monthly summary…</p>
+            )}
+            {summaryError && (
+              <p className="text-red-600 font-medium">{summaryError}</p>
+            )}
+            {!summaryLoading && !summaryError && monthlySummary && (
+              <>
+                {monthlySummary.updatedAt && (
+                  <p className="text-xs text-gray-500">
+                    Last updated:{" "}
+                    {new Date(monthlySummary.updatedAt).toLocaleString()}
+                  </p>
+                )}
+                {monthlySummaryToChartRows(monthlySummary).length > 0 ? (
+                  <RevenueStackedBarChart
+                    rows={monthlySummaryToChartRows(monthlySummary)}
+                    xLabel="month"
+                  />
+                ) : (
+                  <p className="text-sm text-gray-500">No monthly data yet.</p>
+                )}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead>
+                      <tr>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-700">
+                          Month
+                        </th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-700">
+                          Bread stand
+                        </th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-700">
+                          Market
+                        </th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-700">
+                          Online
+                        </th>
+                        <th className="px-3 py-2 text-right font-semibold text-gray-700">
+                          BS retention
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {Object.keys(monthlySummary.months).length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={5}
+                            className="px-3 py-4 text-gray-500 text-sm"
+                          >
+                            No rows in this summary.
+                          </td>
+                        </tr>
+                      ) : (
+                        Object.keys(monthlySummary.months)
+                          .sort()
+                          .map((period) => {
+                            const row = monthlySummary.months[period];
+                            const cell = (t: "bread-stand" | "market" | "online") => {
+                              const b = row.byType?.[t];
+                              if (!b) return <span className="text-gray-400">—</span>;
+                              return (
+                                <div>
+                                  <div className="font-medium tabular-nums">
+                                    {formatMoney(b.revenue)}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {b.transactions} tx · {b.uniqueCustomers} cust
+                                  </div>
+                                </div>
+                              );
+                            };
+                            return (
+                              <tr key={period} className="hover:bg-gray-50/50">
+                                <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
+                                  {period}
+                                </td>
+                                <td className="px-3 py-2 align-top text-gray-900">
+                                  {cell("bread-stand")}
+                                </td>
+                                <td className="px-3 py-2 align-top text-gray-900">
+                                  {cell("market")}
+                                </td>
+                                <td className="px-3 py-2 align-top text-gray-900">
+                                  {cell("online")}
+                                </td>
+                                <td className="px-3 py-2 text-right text-gray-900 tabular-nums align-top">
+                                  {row.breadStandRetentionPct == null
+                                    ? "—"
+                                    : `${row.breadStandRetentionPct.toFixed(1)}%`}
+                                </td>
+                              </tr>
+                            );
+                          })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {revenueTab === "manage" && (
+          <div className="space-y-6">
+            <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-gray-900">
+                Remove transactions in range
+              </h3>
+              <p className="text-sm text-gray-600">
+                Deletes stored per-day files for each calendar day from{" "}
+                <span className="font-medium">From</span> through{" "}
+                <span className="font-medium">Until</span> (inclusive), then rebuilds the
+                monthly summary from what remains.
+              </p>
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <label
+                    htmlFor="revenue-del-from"
+                    className="block text-xs font-medium text-gray-600 mb-1"
+                  >
+                    From
+                  </label>
+                  <input
+                    id="revenue-del-from"
+                    type="date"
+                    value={deleteFrom}
+                    onChange={(e) => setDeleteFrom(e.target.value)}
+                    disabled={deleteBusy}
+                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="revenue-del-until"
+                    className="block text-xs font-medium text-gray-600 mb-1"
+                  >
+                    Until
+                  </label>
+                  <input
+                    id="revenue-del-until"
+                    type="date"
+                    value={deleteUntil}
+                    onChange={(e) => setDeleteUntil(e.target.value)}
+                    disabled={deleteBusy}
+                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void onDeleteRange()}
+                  disabled={deleteBusy}
+                  className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-white shadow hover:bg-amber-800 disabled:opacity-50"
+                >
+                  {deleteBusy ? "Removing…" : "Remove transactions in range"}
+                </button>
+              </div>
+              {deleteError && (
+                <p className="text-sm text-red-600">{deleteError}</p>
+              )}
+              {deleteMessage && !deleteError && (
+                <p className="text-sm text-green-700">{deleteMessage}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
             <p className="text-sm text-gray-600">
               Choose where this export came from. The app converts it to the upload
               format (Date, From, Amount (total), Type) before sending.
@@ -695,6 +1004,7 @@ export default function RevenueView() {
             {uploadMessage && !uploadError && (
               <p className="mt-2 text-sm text-green-700">{uploadMessage}</p>
             )}
+            </div>
           </div>
         )}
 
