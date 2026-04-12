@@ -6,25 +6,6 @@ import {
   type UploadSource,
 } from "@/lib/revenueUploadCsv";
 
-type MonthEntry = {
-  period: string;
-  revenueCents: number;
-  currency: string;
-  /** Revenue in cents per normalized transaction type */
-  byTypeCents?: Record<string, number>;
-};
-
-type YearEntry = {
-  period: string;
-  revenueCents: number;
-  byTypeCents?: Record<string, number>;
-};
-
-type RevenueResponse = {
-  byMonth: MonthEntry[];
-  byYear: YearEntry[];
-};
-
 type MonthlySummaryByType = {
   transactions: number;
   revenue: number;
@@ -57,12 +38,6 @@ type CustomerRow = {
   transactionCount: number;
   totalRevenue: number;
 };
-
-const PRESETS = [
-  { id: "last12", label: "Last 12 months" },
-  { id: "thisYear", label: "This year" },
-  { id: "all", label: "All time" },
-] as const;
 
 const THRESHOLD_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
@@ -159,92 +134,6 @@ function toIsoDate(d: Date): string {
   const m = d.getMonth() + 1;
   const day = d.getDate();
   return `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
-/** Inclusive date range for GET /revenue-transactions (YYYY-MM-DD). */
-function presetToDateRange(preset: string): { from: string; until: string } {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const until = toIsoDate(now);
-
-  if (preset === "all") {
-    // Bounded default: avoid unbounded day iteration in the query Lambda.
-    return { from: "2018-01-01", until };
-  }
-  if (preset === "thisYear") {
-    return { from: `${year}-01-01`, until };
-  }
-  if (preset === "last12") {
-    const from = new Date(year, month - 11, 1);
-    return { from: toIsoDate(from), until };
-  }
-  if (/^\d{4}$/.test(preset)) {
-    const y = parseInt(preset, 10);
-    return { from: `${y}-01-01`, until: `${y}-12-31` };
-  }
-  return { from: `${year}-01-01`, until };
-}
-
-/** CSV Date column MM/DD/YYYY → calendar month key YYYY-MM. */
-function parseTxMonthPeriod(dateStr: string): string | null {
-  const m = String(dateStr).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!m) return null;
-  const mm = parseInt(m[1], 10);
-  const yyyy = parseInt(m[3], 10);
-  if (mm < 1 || mm > 12) return null;
-  return `${yyyy}-${String(mm).padStart(2, "0")}`;
-}
-
-function aggregateTransactionsToRevenue(transactions: RevenueTx[]): RevenueResponse {
-  const byMonthMap = new Map<string, { totalCents: number; byType: Map<string, number> }>();
-  for (const t of transactions) {
-    const period = parseTxMonthPeriod(String(t.date));
-    if (!period) continue;
-    const amt = Number(t.amountTotal) || 0;
-    const cents = Math.round(amt * 100);
-    const ty = normalizeTxType(t);
-    let row = byMonthMap.get(period);
-    if (!row) {
-      row = { totalCents: 0, byType: new Map() };
-      byMonthMap.set(period, row);
-    }
-    row.totalCents += cents;
-    row.byType.set(ty, (row.byType.get(ty) ?? 0) + cents);
-  }
-  const byMonth: MonthEntry[] = Array.from(byMonthMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([period, v]) => ({
-      period,
-      revenueCents: v.totalCents,
-      currency: "usd",
-      byTypeCents: Object.fromEntries(v.byType) as Record<string, number>,
-    }));
-
-  const byYearMap = new Map<string, { totalCents: number; byType: Map<string, number> }>();
-  for (const m of byMonth) {
-    const y = m.period.slice(0, 4);
-    let row = byYearMap.get(y);
-    if (!row) {
-      row = { totalCents: 0, byType: new Map() };
-      byYearMap.set(y, row);
-    }
-    row.totalCents += m.revenueCents;
-    if (m.byTypeCents) {
-      for (const [k, cents] of Object.entries(m.byTypeCents)) {
-        row.byType.set(k, (row.byType.get(k) ?? 0) + cents);
-      }
-    }
-  }
-  const byYear: YearEntry[] = Array.from(byYearMap.entries())
-    .map(([period, v]) => ({
-      period,
-      revenueCents: v.totalCents,
-      byTypeCents: Object.fromEntries(v.byType) as Record<string, number>,
-    }))
-    .sort((a, b) => a.period.localeCompare(b.period));
-
-  return { byMonth, byYear };
 }
 
 function typeBarSegmentBg(type: string): string {
@@ -426,13 +315,6 @@ function aggregateCustomersByFrom(transactions: RevenueTx[]): CustomerRow[] {
 }
 
 export default function RevenueView() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<RevenueResponse | null>(null);
-  const [preset, setPreset] = useState<string>("thisYear");
-  const [viewMode, setViewMode] = useState<"month" | "year">("month");
-  const [yearOptions, setYearOptions] = useState<string[]>([]);
-
   const defaults = useMemo(() => defaultFromUntil(), []);
   const [txFrom, setTxFrom] = useState(defaults.from);
   const [txUntil, setTxUntil] = useState(defaults.until);
@@ -447,7 +329,7 @@ export default function RevenueView() {
   const [txTypeFilter, setTxTypeFilter] = useState<string>("all");
   const [txLoadedOnce, setTxLoadedOnce] = useState(false);
   const [revenueTab, setRevenueTab] = useState<
-    "summary" | "reports" | "detail" | "manage"
+    "summary" | "detail" | "manage"
   >("summary");
   const [monthlySummary, setMonthlySummary] = useState<MonthlySummaryApi | null>(
     null
@@ -496,42 +378,6 @@ export default function RevenueView() {
   useEffect(() => {
     if (revenueTab === "summary") void loadMonthlySummary();
   }, [revenueTab, loadMonthlySummary]);
-
-  const fetchRevenue = useCallback(async (presetValue: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const { from, until } = presetToDateRange(presetValue);
-      const params = new URLSearchParams({ from, until });
-      const res = await fetch(`/api/revenue-transactions?${params.toString()}`);
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? "Failed to load revenue data");
-      }
-      const body = await res.json().catch(() => ({}));
-      const list = (body.transactions ?? []) as RevenueTx[];
-      const json = aggregateTransactionsToRevenue(Array.isArray(list) ? list : []);
-      setData(json);
-
-      const years = [...new Set(json.byMonth.map((m) => m.period.slice(0, 4)))].sort(
-        (a, b) => b.localeCompare(a)
-      );
-      setYearOptions(years);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load revenue data");
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchRevenue(preset);
-  }, [preset, fetchRevenue]);
-
-  const handlePresetChange = (value: string) => {
-    setPreset(value);
-  };
 
   const distinctTypesInRange = useMemo(() => {
     const set = new Set<string>();
@@ -723,19 +569,6 @@ export default function RevenueView() {
             }`}
           >
             Monthly Summary
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={revenueTab === "reports"}
-            onClick={() => setRevenueTab("reports")}
-            className={`px-4 py-2.5 text-sm font-medium sm:min-w-[10rem] border-l border-gray-200 ${
-              revenueTab === "reports"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-            }`}
-          >
-            Revenue Reports
           </button>
           <button
             type="button"
@@ -1008,142 +841,6 @@ export default function RevenueView() {
           </div>
         )}
 
-        {revenueTab === "reports" && (
-          <>
-        <div className="flex flex-wrap items-center gap-3 mb-4">
-          <label htmlFor="revenue-preset" className="text-sm font-medium text-gray-700">
-            Period
-          </label>
-          <select
-            id="revenue-preset"
-            value={preset}
-            onChange={(e) => handlePresetChange(e.target.value)}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            {PRESETS.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-            {yearOptions.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setViewMode("month")}
-              className={`px-3 py-2 text-sm font-medium ${
-                viewMode === "month"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              By month
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("year")}
-              className={`px-3 py-2 text-sm font-medium ${
-                viewMode === "year"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              By year
-            </button>
-          </div>
-        </div>
-
-        {loading && (
-          <p className="text-gray-500">Loading revenue data…</p>
-        )}
-
-        {error && (
-          <p className="text-red-600 font-medium">{error}</p>
-        )}
-
-        {!loading && !error && data && viewMode === "month" && (
-          <>
-          <RevenueStackedBarChart rows={data.byMonth} xLabel="month" />
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead>
-                <tr>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">
-                    Month
-                  </th>
-                  <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700">
-                    Revenue
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {data.byMonth.length === 0 ? (
-                  <tr>
-                    <td colSpan={2} className="px-4 py-4 text-gray-500 text-sm">
-                      No revenue data for this period.
-                    </td>
-                  </tr>
-                ) : (
-                  data.byMonth.map((row) => (
-                    <tr key={row.period} className="hover:bg-gray-50/50">
-                      <td className="px-4 py-2 text-sm text-gray-900">{row.period}</td>
-                      <td className="px-4 py-2 text-sm text-right font-medium text-gray-900">
-                        {formatCurrency(row.revenueCents, row.currency)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          </>
-        )}
-
-        {!loading && !error && data && viewMode === "year" && (
-          <>
-          <RevenueStackedBarChart rows={data.byYear} xLabel="year" />
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead>
-                <tr>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">
-                    Year
-                  </th>
-                  <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700">
-                    Revenue
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {data.byYear.length === 0 ? (
-                  <tr>
-                    <td colSpan={2} className="px-4 py-4 text-gray-500 text-sm">
-                      No revenue data for this period.
-                    </td>
-                  </tr>
-                ) : (
-                  data.byYear.map((row) => (
-                    <tr key={row.period} className="hover:bg-gray-50/50">
-                      <td className="px-4 py-2 text-sm text-gray-900">{row.period}</td>
-                      <td className="px-4 py-2 text-sm text-right font-medium text-gray-900">
-                        {formatCurrency(row.revenueCents, "usd")}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          </>
-        )}
-
-        </>
-        )}
-
         {revenueTab === "detail" && (
         <div className="space-y-4">
         <h3 className="text-base font-semibold text-gray-900 mb-1">
@@ -1152,7 +849,7 @@ export default function RevenueView() {
         <p className="text-sm text-gray-600 mb-4">
           Load uploaded CSV data for a date range. Use{" "}
           <span className="font-medium">Type</span> under the date fields to narrow
-          loaded transactions. Same underlying data as Revenue Reports (aggregated by month or year there).
+          loaded transactions.
         </p>
         <div className="flex flex-wrap items-end gap-3 mb-3">
           <div>
