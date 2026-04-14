@@ -205,6 +205,36 @@ function MonthBarTooltipPanel({ row }: { row: RevenueChartRow }) {
   );
 }
 
+/** Straight line segments between consecutive months with retention (SVG viewBox 0..n × 0..100). */
+function retentionStraightSegments(
+  rows: RevenueChartRow[]
+): { x1: number; y1: number; x2: number; y2: number }[] {
+  const segs: { x1: number; y1: number; x2: number; y2: number }[] = [];
+  let prev: { i: number; ret: number } | null = null;
+  rows.forEach((row, i) => {
+    const r = row.breadStandRetentionPct;
+    if (r == null) {
+      prev = null;
+      return;
+    }
+    if (prev != null) {
+      segs.push({
+        x1: prev.i + 0.5,
+        y1: 100 - prev.ret,
+        x2: i + 0.5,
+        y2: 100 - r,
+      });
+    }
+    prev = { i, ret: r };
+  });
+  return segs;
+}
+
+function formatRetentionPointLabel(pct: number): string {
+  const rounded = Math.round(pct);
+  return `${rounded}%`;
+}
+
 function RevenueStackedBarChart({
   rows,
   xLabel,
@@ -238,6 +268,7 @@ function RevenueStackedBarChart({
   useEffect(() => () => cancelHideTooltip(), []);
 
   if (rows.length === 0) return null;
+  const n = rows.length;
   const maxBar = Math.max(...rows.map((r) => r.revenueCents), 1);
   const allTypes = new Set<string>();
   for (const r of rows) {
@@ -249,94 +280,146 @@ function RevenueStackedBarChart({
   }
   const legendTypes = [...allTypes].sort(compareTypeKeys);
 
-  const gridTemplate = `repeat(${rows.length}, minmax(2.75rem, 1fr))`;
+  const gridTemplate = `repeat(${n}, minmax(2.75rem, 1fr))`;
+  const lineSegments = retentionStraightSegments(rows);
 
   return (
     <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
       <p className="mb-3 text-sm text-gray-800">
         <span className="font-medium">Revenue by {xLabel}</span>
-        <span className="text-gray-600">
-          {" "}
-          — bar height is revenue; rose dots are retention % (0% bottom, 100% top).
-        </span>
+        
       </p>
-      <div
-        className="grid min-w-0 gap-2"
-        style={{ gridTemplateColumns: gridTemplate }}
-      >
-        {rows.map((row) => {
-          const rowTypes =
-            row.revenueCents <= 0
-              ? []
-              : Object.entries(row.byTypeCents ?? {})
-                  .filter(([, c]) => c > 0)
-                  .sort(([a], [b]) => compareTypeKeys(a, b))
-                  .map(([t]) => t);
-          const barHeightPct = (row.revenueCents / maxBar) * 100;
-          const ret = row.breadStandRetentionPct;
-          const open = hoverPeriod === row.period;
-          return (
-            <div
-              key={row.period}
-              className="flex min-w-0 flex-col items-center gap-1"
-              onMouseEnter={() => showTooltip(row.period)}
-              onMouseLeave={hideTooltipSoon}
-            >
-              <div className="relative w-full max-w-[3.75rem]">
-                {open && (
-                  <div
-                    className="absolute bottom-full left-1/2 z-50 mb-2 w-max min-w-[11rem] -translate-x-1/2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 shadow-lg ring-1 ring-black/5"
-                    role="tooltip"
-                  >
-                    <MonthBarTooltipPanel row={row} />
-                  </div>
-                )}
-                <div className="relative h-52 w-full">
-                  {ret != null && (
+      <div className="relative min-w-0">
+        <div
+          className="grid min-w-0 gap-0"
+          style={{ gridTemplateColumns: gridTemplate }}
+        >
+          {rows.map((row) => {
+            const rowTypes =
+              row.revenueCents <= 0
+                ? []
+                : Object.entries(row.byTypeCents ?? {})
+                    .filter(([, c]) => c > 0)
+                    .sort(([a], [b]) => compareTypeKeys(a, b))
+                    .map(([t]) => t);
+            const barHeightPct = (row.revenueCents / maxBar) * 100;
+            const ret = row.breadStandRetentionPct;
+            const open = hoverPeriod === row.period;
+            return (
+              <div
+                key={row.period}
+                className="flex min-w-0 flex-col items-center gap-1 px-0.5"
+                onMouseEnter={() => showTooltip(row.period)}
+                onMouseLeave={hideTooltipSoon}
+              >
+                <div className="relative w-full">
+                  {open && (
                     <div
-                      className="pointer-events-none absolute left-1/2 z-20 h-2.5 w-2.5 rounded-full bg-rose-600 shadow ring-2 ring-white"
-                      style={{
-                        top: `${100 - ret}%`,
-                        transform: "translate(-50%, -50%)",
-                      }}
-                      aria-hidden
-                    />
-                  )}
-                  <div className="absolute inset-0 flex flex-col justify-end">
-                    <div
-                      className="relative z-10 mx-auto flex w-[85%] max-w-[2.75rem] flex-col justify-end"
-                      style={{ height: `${barHeightPct}%` }}
+                      className="absolute bottom-full left-1/2 z-50 mb-2 w-max min-w-[11rem] -translate-x-1/2 rounded-lg border border-gray-200 bg-white px-3 py-2.5 shadow-lg ring-1 ring-black/5"
+                      role="tooltip"
                     >
-                      <div className="flex min-h-0 w-full flex-1 flex-col-reverse overflow-hidden rounded-t shadow-inner ring-1 ring-gray-200/80">
-                        {rowTypes.length === 0 && row.revenueCents > 0 ? (
-                          <div className="h-full w-full bg-gray-300" />
-                        ) : (
-                          rowTypes.map((ty) => {
-                            const c = row.byTypeCents?.[ty] ?? 0;
-                            const pct =
-                              row.revenueCents > 0
-                                ? (c / row.revenueCents) * 100
-                                : 0;
-                            return (
-                              <div
-                                key={ty}
-                                className={`min-h-[2px] w-full shrink-0 ${typeBarSegmentBg(ty)}`}
-                                style={{ height: `${pct}%` }}
-                              />
-                            );
-                          })
-                        )}
+                      <MonthBarTooltipPanel row={row} />
+                    </div>
+                  )}
+                  <div className="relative h-52 w-full">
+                    <div className="absolute inset-0 flex flex-col justify-end">
+                      <div
+                        className="relative z-10 mx-auto flex w-[85%] max-w-[2.75rem] flex-col justify-end"
+                        style={{ height: `${barHeightPct}%` }}
+                      >
+                        <div className="flex min-h-0 w-full flex-1 flex-col-reverse overflow-hidden rounded-t shadow-inner ring-1 ring-gray-200/80">
+                          {rowTypes.length === 0 && row.revenueCents > 0 ? (
+                            <div className="h-full w-full bg-gray-300" />
+                          ) : (
+                            rowTypes.map((ty) => {
+                              const c = row.byTypeCents?.[ty] ?? 0;
+                              const pct =
+                                row.revenueCents > 0
+                                  ? (c / row.revenueCents) * 100
+                                  : 0;
+                              return (
+                                <div
+                                  key={ty}
+                                  className={`min-h-[2px] w-full shrink-0 ${typeBarSegmentBg(ty)}`}
+                                  style={{ height: `${pct}%` }}
+                                />
+                              );
+                            })
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
+                <span className="max-w-[4.5rem] text-center text-[10px] leading-tight text-gray-600 sm:text-xs">
+                  {row.period}
+                </span>
               </div>
-              <span className="max-w-[4.5rem] text-center text-[10px] leading-tight text-gray-600 sm:text-xs">
-                {row.period}
-              </span>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+        <svg
+          className="pointer-events-none absolute left-0 right-0 top-0 z-[18] h-52 w-full text-rose-600"
+          viewBox={`0 0 ${n} 100`}
+          preserveAspectRatio="none"
+          aria-hidden
+        >
+          {lineSegments.map((seg, si) => (
+            <line
+              key={si}
+              x1={seg.x1}
+              y1={seg.y1}
+              x2={seg.x2}
+              y2={seg.y2}
+              stroke="currentColor"
+              strokeWidth={0.35}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          {rows.map((row, i) => {
+            const ret = row.breadStandRetentionPct;
+            if (ret == null) return null;
+            return (
+              <circle
+                key={`dot-${row.period}`}
+                cx={i + 0.5}
+                cy={100 - ret}
+                r={0.42}
+                fill="currentColor"
+                stroke="white"
+                strokeWidth={0.12}
+                vectorEffect="non-scaling-stroke"
+              />
+            );
+          })}
+        </svg>
+        <div
+          className="pointer-events-none absolute left-0 right-0 top-0 z-[25] grid h-52"
+          style={{ gridTemplateColumns: gridTemplate }}
+          aria-hidden
+        >
+          {rows.map((row) => {
+            const ret = row.breadStandRetentionPct;
+            if (ret == null) {
+              return <div key={`lab-${row.period}`} />;
+            }
+            return (
+              <div
+                key={`lab-${row.period}`}
+                className="relative px-0.5"
+              >
+                <span
+                  className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold tabular-nums text-rose-700 sm:text-[11px]"
+                  style={{
+                    top: `calc(${100 - ret}% - 16px)`,
+                  }}
+                >
+                  {formatRetentionPointLabel(ret)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 border-t border-gray-100 pt-3 text-xs text-gray-600">
         {legendTypes.map((ty) => (
@@ -348,7 +431,10 @@ function RevenueStackedBarChart({
           </span>
         ))}
         <span className="inline-flex items-center gap-1.5 text-gray-700">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-rose-600 ring-2 ring-white shadow" />
+          <span className="inline-flex items-center gap-0.5">
+            <span className="h-0.5 w-4 shrink-0 rounded-full bg-rose-600" />
+            <span className="h-2 w-2 shrink-0 rounded-full bg-rose-600 ring-2 ring-white shadow" />
+          </span>
           Retention (bread-stand)
         </span>
       </div>
@@ -704,12 +790,7 @@ export default function RevenueView() {
             )}
             {!summaryLoading && !summaryError && monthlySummary && (
               <>
-                {monthlySummary.updatedAt && (
-                  <p className="text-xs text-gray-500">
-                    Last updated:{" "}
-                    {new Date(monthlySummary.updatedAt).toLocaleString()}
-                  </p>
-                )}
+             
                 {monthlySummaryToChartRows(monthlySummary).length > 0 ? (
                   <RevenueStackedBarChart
                     rows={monthlySummaryToChartRows(monthlySummary)}
