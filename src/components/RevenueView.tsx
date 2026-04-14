@@ -154,6 +154,7 @@ type RevenueChartRow = {
   period: string;
   revenueCents: number;
   byTypeCents?: Record<string, number>;
+  breadStandRetentionPct: number | null;
 };
 
 function monthlySummaryToChartRows(summary: MonthlySummaryApi): RevenueChartRow[] {
@@ -168,8 +169,32 @@ function monthlySummaryToChartRows(summary: MonthlySummaryApi): RevenueChartRow[
       byTypeCents[t] = c;
       revenueCents += c;
     }
-    return { period, revenueCents, byTypeCents };
+    return {
+      period,
+      revenueCents,
+      byTypeCents,
+      breadStandRetentionPct: m.breadStandRetentionPct ?? null,
+    };
   });
+}
+
+function formatMonthColumnTooltip(row: RevenueChartRow): string {
+  const parts: string[] = [`${row.period}`];
+  parts.push(`Total ${formatCurrency(row.revenueCents)}`);
+  const types = Object.entries(row.byTypeCents ?? {})
+    .filter(([, c]) => c > 0)
+    .sort(([a], [b]) => compareTypeKeys(a, b));
+  for (const [ty, c] of types) {
+    parts.push(`${formatTypeFilterLabel(ty)} ${formatCurrency(c)}`);
+  }
+  if (row.breadStandRetentionPct != null) {
+    parts.push(
+      `Retention (bread-stand) ${row.breadStandRetentionPct.toFixed(1)}%`
+    );
+  } else {
+    parts.push("Retention (bread-stand) —");
+  }
+  return parts.join(" · ");
 }
 
 function RevenueStackedBarChart({
@@ -180,6 +205,7 @@ function RevenueStackedBarChart({
   xLabel: string;
 }) {
   if (rows.length === 0) return null;
+  const n = rows.length;
   const maxBar = Math.max(...rows.map((r) => r.revenueCents), 1);
   const allTypes = new Set<string>();
   for (const r of rows) {
@@ -191,76 +217,182 @@ function RevenueStackedBarChart({
   }
   const legendTypes = [...allTypes].sort(compareTypeKeys);
 
+  const retentionSegments: string[] = [];
+  let run: string[] = [];
+  const flushRun = () => {
+    if (run.length >= 2) retentionSegments.push(run.join(" "));
+    run = [];
+  };
+  for (let i = 0; i < rows.length; i++) {
+    const p = rows[i].breadStandRetentionPct;
+    if (p == null) {
+      flushRun();
+      continue;
+    }
+    const x = i + 0.5;
+    const y = 100 - p;
+    run.push(`${x},${y}`);
+  }
+  flushRun();
+
+  const gridTemplate = `repeat(${n}, minmax(2.75rem, 1fr))`;
+
   return (
     <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
       <p className="mb-3 text-sm font-medium text-gray-800">
-        Revenue by {xLabel} (stacked by type)
+        Revenue by {xLabel} (stacked by type) and retention (bread-stand)
       </p>
-      <div className="flex min-h-[13rem] flex-wrap items-end justify-start gap-2 overflow-x-auto pb-2 pt-1">
-        {rows.map((row) => {
-          const rowTypes =
-            row.revenueCents <= 0
-              ? []
-              : Object.entries(row.byTypeCents ?? {})
-                  .filter(([, c]) => c > 0)
-                  .sort(([a], [b]) => compareTypeKeys(a, b))
-                  .map(([t]) => t);
-          const barHeightPct = (row.revenueCents / maxBar) * 100;
-          return (
-            <div
-              key={row.period}
-              className="flex min-w-[2.75rem] flex-col items-center gap-1"
-            >
-              <div className="flex h-52 w-10 flex-col justify-end sm:w-11">
-                <div
-                  className="flex w-full min-h-0 flex-col-reverse overflow-hidden rounded-t shadow-inner ring-1 ring-gray-200/80"
-                  style={{ height: `${barHeightPct}%` }}
-                  title={formatCurrency(row.revenueCents)}
-                >
-                  {rowTypes.length === 0 && row.revenueCents > 0 ? (
-                    <div
-                      className="h-full w-full bg-gray-300"
-                      title={formatCurrency(row.revenueCents)}
-                    />
-                  ) : (
-                    rowTypes.map((ty) => {
-                      const c = row.byTypeCents?.[ty] ?? 0;
-                      const pct =
-                        row.revenueCents > 0 ? (c / row.revenueCents) * 100 : 0;
-                      return (
-                        <div
-                          key={ty}
-                          className={`min-h-[2px] w-full shrink-0 ${typeBarSegmentBg(ty)}`}
-                          style={{ height: `${pct}%` }}
-                          title={`${formatTypeFilterLabel(ty)}: ${formatCurrency(c)}`}
-                        />
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-              <span
-                className="max-w-[4.5rem] text-center text-[10px] leading-tight text-gray-600 sm:text-xs"
-                title={row.period}
-              >
-                {row.period}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-      {legendTypes.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-gray-100 pt-3 text-xs text-gray-600">
-          {legendTypes.map((ty) => (
-            <span key={ty} className="inline-flex items-center gap-1.5">
-              <span
-                className={`h-2.5 w-2.5 shrink-0 rounded-sm ${typeBarSegmentBg(ty)}`}
-              />
-              {formatTypeFilterLabel(ty)}
-            </span>
-          ))}
+      <div className="flex min-w-0 gap-2">
+        <div
+          className="flex w-8 shrink-0 flex-col justify-between pt-1 pb-8 text-[10px] leading-none text-gray-500"
+          aria-hidden
+        >
+          <span>100%</span>
+          <span>50%</span>
+          <span>0%</span>
         </div>
-      )}
+        <div
+          className="grid min-w-0 flex-1 gap-2"
+          style={{ gridTemplateColumns: gridTemplate }}
+        >
+          <div className="col-span-full h-24 min-h-[5rem]">
+            <svg
+              className="h-full w-full text-rose-600"
+              viewBox={`0 0 ${n} 100`}
+              preserveAspectRatio="none"
+              aria-label="Bread-stand retention rate over time"
+            >
+              <line
+                x1="0"
+                y1="0"
+                x2={n}
+                y2="0"
+                className="stroke-gray-200"
+                strokeWidth={0.08}
+                vectorEffect="non-scaling-stroke"
+              />
+              <line
+                x1="0"
+                y1="50"
+                x2={n}
+                y2="50"
+                className="stroke-gray-100"
+                strokeWidth={0.06}
+                vectorEffect="non-scaling-stroke"
+              />
+              <line
+                x1="0"
+                y1="100"
+                x2={n}
+                y2="100"
+                className="stroke-gray-200"
+                strokeWidth={0.08}
+                vectorEffect="non-scaling-stroke"
+              />
+              {retentionSegments.map((pts, si) => (
+                <polyline
+                  key={si}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={0.35}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  points={pts}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+              {rows.map((row, i) => {
+                const p = row.breadStandRetentionPct;
+                if (p == null) return null;
+                const title = `Retention (bread-stand): ${p.toFixed(1)}% (${row.period})`;
+                return (
+                  <circle
+                    key={`${row.period}-ret`}
+                    cx={i + 0.5}
+                    cy={100 - p}
+                    r={0.42}
+                    fill="currentColor"
+                    className="text-rose-600"
+                  >
+                    <title>{title}</title>
+                  </circle>
+                );
+              })}
+            </svg>
+          </div>
+
+          {rows.map((row) => {
+            const rowTypes =
+              row.revenueCents <= 0
+                ? []
+                : Object.entries(row.byTypeCents ?? {})
+                    .filter(([, c]) => c > 0)
+                    .sort(([a], [b]) => compareTypeKeys(a, b))
+                    .map(([t]) => t);
+            const barHeightPct = (row.revenueCents / maxBar) * 100;
+            const columnTip = formatMonthColumnTooltip(row);
+            return (
+              <div
+                key={row.period}
+                className="flex min-w-0 flex-col items-center gap-1"
+              >
+                <div
+                  className="flex h-52 w-full max-w-[3.5rem] flex-col justify-end"
+                  title={columnTip}
+                >
+                  <div
+                    className="flex w-full min-h-0 flex-col-reverse overflow-hidden rounded-t shadow-inner ring-1 ring-gray-200/80"
+                    style={{ height: `${barHeightPct}%` }}
+                    title={columnTip}
+                  >
+                    {rowTypes.length === 0 && row.revenueCents > 0 ? (
+                      <div
+                        className="h-full w-full bg-gray-300"
+                        title={columnTip}
+                      />
+                    ) : (
+                      rowTypes.map((ty) => {
+                        const c = row.byTypeCents?.[ty] ?? 0;
+                        const pct =
+                          row.revenueCents > 0 ? (c / row.revenueCents) * 100 : 0;
+                        const segTip = `${formatTypeFilterLabel(ty)}: ${formatCurrency(c)} (${row.period})`;
+                        return (
+                          <div
+                            key={ty}
+                            className={`min-h-[2px] w-full shrink-0 ${typeBarSegmentBg(ty)}`}
+                            style={{ height: `${pct}%` }}
+                            title={segTip}
+                          />
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+                <span
+                  className="max-w-[4.5rem] text-center text-[10px] leading-tight text-gray-600 sm:text-xs"
+                  title={columnTip}
+                >
+                  {row.period}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 border-t border-gray-100 pt-3 text-xs text-gray-600">
+        {legendTypes.map((ty) => (
+          <span key={ty} className="inline-flex items-center gap-1.5">
+            <span
+              className={`h-2.5 w-2.5 shrink-0 rounded-sm ${typeBarSegmentBg(ty)}`}
+            />
+            {formatTypeFilterLabel(ty)}
+          </span>
+        ))}
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-0.5 w-8 shrink-0 rounded-full bg-rose-600" />
+          Retention (bread-stand)
+        </span>
+      </div>
     </div>
   );
 }
@@ -644,7 +776,7 @@ export default function RevenueView() {
                           Online
                         </th>
                         <th className="px-3 py-2 text-right font-semibold text-gray-700">
-                          BS retention
+                          Retention (bread-stand)
                         </th>
                       </tr>
                     </thead>
