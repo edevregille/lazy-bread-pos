@@ -783,7 +783,7 @@ export default function RevenueView() {
                 <code className="text-xs bg-gray-100 px-1 rounded">Amount (total)</code>.
                 If the export includes a{" "}
                 <code className="text-xs bg-gray-100 px-1 rounded">Type</code> column, only rows
-                with Type = Transaction are imported. Each imported row is stored with{" "}
+                with Type = Payment are imported. Each imported row is stored with{" "}
                 <code className="text-xs bg-gray-100 px-1 rounded">Type</code> = bread-stand.
               </li>
               <li>

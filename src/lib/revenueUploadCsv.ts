@@ -144,12 +144,12 @@ export function transformVenmoToCanonical(
   if (typeIdx >= 0) {
     rowsToUse = rows.filter((r) => {
       const t = String(r[typeIdx] ?? "").trim();
-      return t.toLowerCase() === "transaction";
+      return t.toLowerCase() === "payment";
     });
     if (rowsToUse.length === 0) {
       return {
         error:
-          'Venmo CSV has a Type column but no rows with Type = "Transaction".',
+          'Venmo CSV has a Type column but no rows with Type = "Payment".',
       };
     }
   }
