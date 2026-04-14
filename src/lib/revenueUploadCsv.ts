@@ -139,6 +139,20 @@ export function transformVenmoToCanonical(
   if (rows.length === 0) {
     return { error: "No data rows in CSV." };
   }
+  const typeIdx = headers.indexOf("Type");
+  let rowsToUse = rows;
+  if (typeIdx >= 0) {
+    rowsToUse = rows.filter((r) => {
+      const t = String(r[typeIdx] ?? "").trim();
+      return t.toLowerCase() === "transaction";
+    });
+    if (rowsToUse.length === 0) {
+      return {
+        error:
+          'Venmo CSV has a Type column but no rows with Type = "Transaction".',
+      };
+    }
+  }
   const idx = {
     date: headers.indexOf("Date"),
     from: headers.indexOf("From"),
@@ -146,7 +160,7 @@ export function transformVenmoToCanonical(
   };
   const outHeaders = ["Date", "From", "Amount (total)", "Type"];
   const outRows: string[][] = [];
-  for (const r of rows) {
+  for (const r of rowsToUse) {
     const date = String(r[idx.date] ?? "").trim();
     const from = String(r[idx.from] ?? "").trim();
     const amount = String(r[idx.amount] ?? "").trim();

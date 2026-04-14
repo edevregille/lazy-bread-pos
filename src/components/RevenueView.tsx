@@ -781,8 +781,10 @@ export default function RevenueView() {
                 <code className="text-xs bg-gray-100 px-1 rounded">Date</code> (MM/DD/YYYY),{" "}
                 <code className="text-xs bg-gray-100 px-1 rounded">From</code>,{" "}
                 <code className="text-xs bg-gray-100 px-1 rounded">Amount (total)</code>.
-                Each row gets <code className="text-xs bg-gray-100 px-1 rounded">Type</code>{" "}
-                = bread-stand.
+                If the export includes a{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">Type</code> column, only rows
+                with Type = Transaction are imported. Each imported row is stored with{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">Type</code> = bread-stand.
               </li>
               <li>
                 <span className="font-medium">Stripe</span>: columns{" "}
