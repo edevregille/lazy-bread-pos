@@ -88,6 +88,30 @@ export function parseCsv(text: string): { headers: string[]; rows: string[][] } 
   return { headers, rows };
 }
 
+/** Match CSV header ignoring case and outer whitespace. */
+function headerIndexCi(headers: string[], name: string): number {
+  const want = name.trim().toLowerCase();
+  return headers.findIndex((h) => h.trim().toLowerCase() === want);
+}
+
+/**
+ * Venmo sometimes labels the column "Type" or "Transaction Type".
+ * Returns -1 if neither is present.
+ */
+function findVenmoExportTypeColumnIndex(headers: string[]): number {
+  let i = headerIndexCi(headers, "Type");
+  if (i >= 0) return i;
+  i = headerIndexCi(headers, "Transaction Type");
+  return i;
+}
+
+function normalizeVenmoTypeCell(raw: unknown): string {
+  return String(raw ?? "")
+    .replace(/\u200b/g, "")
+    .trim()
+    .toLowerCase();
+}
+
 /** Stripe `created_utc` e.g. "2026-01-10 19:09:18" → MM/DD/YYYY */
 export function createdUtcToMmddyyyy(s: string): string | null {
   const t = String(s).trim();
@@ -139,17 +163,16 @@ export function transformVenmoToCanonical(
   if (rows.length === 0) {
     return { error: "No data rows in CSV." };
   }
-  const typeIdx = headers.indexOf("Type");
+  const typeIdx = findVenmoExportTypeColumnIndex(headers);
   let rowsToUse = rows;
   if (typeIdx >= 0) {
     rowsToUse = rows.filter((r) => {
-      const t = String(r[typeIdx] ?? "").trim();
-      return t.toLowerCase() === "payment";
+      return normalizeVenmoTypeCell(r[typeIdx]) === "payment";
     });
     if (rowsToUse.length === 0) {
       return {
         error:
-          'Venmo CSV has a Type column but no rows with Type = "Payment".',
+          'Venmo CSV has a type column, but no rows have Type = Payment. Only Payment rows are imported when that column exists.',
       };
     }
   }
