@@ -4,7 +4,7 @@ This is a [Next.js](https://nextjs.org) project for the Lazy Bread Point of Sale
 
 ## Features
 
-- **Point of Sale**: Process in-person payments using Stripe Terminal
+- **Point of Sale**: Process in-person payments using Stripe shity Terminal
 - **Online Orders**: View and manage online orders with delivery date grouping
 - **Delivery Maps**: Visualize delivery routes using Google Maps
 - **Order Management**: Track orders, revenue, and bread quantities by delivery date
