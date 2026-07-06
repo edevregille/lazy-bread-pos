@@ -68,6 +68,14 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [configApiUrl, setConfigApiUrl] = useState<string>('');
+  const [jsonText, setJsonText] = useState<string>('');
+  const [jsonError, setJsonError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (config) {
+      setJsonText(JSON.stringify(config, null, 2));
+    }
+  }, [config]);
 
   useEffect(() => {
     // Get config API URL from environment
@@ -433,19 +441,26 @@ export default function SettingsPage() {
             <section className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
               <h2 className="text-2xl font-semibold mb-4 text-gray-900">Advanced: JSON Editor</h2>
                 <textarea
-                  value={JSON.stringify(config, null, 2)}
+                  value={jsonText}
                   onChange={(e) => {
+                    setJsonText(e.target.value);
+                    setJsonError(null);
+                  }}
+                  onBlur={(e) => {
                     try {
                       const parsed = JSON.parse(e.target.value);
                       setConfig(parsed);
-                      setError(null);
+                      setJsonError(null);
                     } catch (err) {
-                      setError('Invalid JSON');
+                      setJsonError(err instanceof Error ? `Invalid JSON: ${err.message}` : 'Invalid JSON');
                     }
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm text-gray-900 bg-white"
                   rows={20}
                 />
+                {jsonError && (
+                  <div className="mt-2 text-sm text-red-700">{jsonError}</div>
+                )}
             </section>
           </div>
         )}
