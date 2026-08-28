@@ -4,6 +4,19 @@ export interface Result {
   paymentIntentStatus?: string;
 }
 
+export interface AdjustedItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+export interface PaymentAdjustment {
+  originalAmount: number;
+  reason?: string;
+  items?: AdjustedItem[];
+}
+
 export const formatDeliveryDate = (dateString: string): string => {
   // Convert the ISO date string to a PST date
   const pstDate = new Date(dateString + 'T00:00:00-08:00'); // Force PST timezone  
@@ -57,7 +70,8 @@ export const capturePayment = async (
   customerId: string,
   paymentMethodId: string | undefined,
   amount: number,
-  orderId: string
+  orderId: string,
+  adjustment?: PaymentAdjustment
 ): Promise<Result> => {
     
     try {
@@ -66,12 +80,15 @@ export const capturePayment = async (
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
               paymentIntentId,
               customerId,
               paymentMethodId,
               amount,
-              orderId
+              orderId,
+              originalAmount: adjustment?.originalAmount,
+              adjustmentReason: adjustment?.reason,
+              adjustedItems: adjustment?.items,
             }),
         });
 

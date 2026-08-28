@@ -38,6 +38,7 @@ interface Order {
   stripeSetupIntentId?: string;
   stripePaymentMethodId?: string;
   stripePaymentStatus: string;
+  amountCollected?: number;
 }
 
 interface OrdersResponse {
@@ -54,6 +55,9 @@ interface DeliveryDateSummary {
   orders: Order[];
 }
 
+// Stripe rejects charges below $0.50 USD
+const MIN_CHARGE_AMOUNT = 0.5;
+
 export default function OrdersList() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,6 +68,9 @@ export default function OrdersList() {
   const [deliveryMessages, setDeliveryMessages] = useState<Record<string, string>>({});
   const [capturingPayments, setCapturingPayments] = useState<Set<string>>(new Set());
   const [captureMessages, setCaptureMessages] = useState<Record<string, string>>({});
+  const [editingOrders, setEditingOrders] = useState<Set<string>>(new Set());
+  const [draftItems, setDraftItems] = useState<Record<string, OrderItem[]>>({});
+  const [adjustmentReasons, setAdjustmentReasons] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchOrders();
@@ -136,7 +143,7 @@ export default function OrdersList() {
       }
 
       groups[deliveryDate].totalOrders++;
-      groups[deliveryDate].totalRevenue += order.totalAmount;
+      groups[deliveryDate].totalRevenue += order.amountCollected ?? order.totalAmount;
       groups[deliveryDate].orders.push(order);
 
       // Aggregate bread quantities
@@ -178,6 +185,78 @@ export default function OrdersList() {
 
   const getTotalBreadCount = (breadSummary: { [key: string]: number }) => {
     return Object.values(breadSummary).reduce((total, quantity) => total + quantity, 0);
+  };
+
+  const getOrderItems = (order: Order): OrderItem[] => order.items || [];
+
+  const getLineTotal = (item: OrderItem) => (item.price || 0) * (item.quantity || 0);
+
+  const sumItems = (items: OrderItem[]) =>
+    items.reduce((total, item) => total + getLineTotal(item), 0);
+
+  // Once an order has been collected for less than it was placed for, the collected
+  // amount is the truth for display and for the delivery date's revenue.
+  const getOrderAmount = (order: Order) => order.amountCollected ?? order.totalAmount;
+
+  // Adjustments are applied as a delta against the ordered items rather than by summing
+  // the draft, so anything in the total that is not a line item (fees, discounts) survives.
+  const getChargeAmount = (order: Order): number => {
+    const draft = draftItems[order.id];
+    if (!draft) return getOrderAmount(order);
+    const delta = sumItems(getOrderItems(order)) - sumItems(draft);
+    return Math.max(0, Math.round((order.totalAmount - delta) * 100) / 100);
+  };
+
+  const isAdjusted = (order: Order): boolean =>
+    Boolean(draftItems[order.id]) &&
+    Math.round(getChargeAmount(order) * 100) !== Math.round(order.totalAmount * 100);
+
+  const clearAdjustment = (orderId: string) => {
+    setDraftItems(prev => {
+      const next = { ...prev };
+      delete next[orderId];
+      return next;
+    });
+    setAdjustmentReasons(prev => {
+      const next = { ...prev };
+      delete next[orderId];
+      return next;
+    });
+    setEditingOrders(prev => {
+      const next = new Set(prev);
+      next.delete(orderId);
+      return next;
+    });
+  };
+
+  const toggleAdjustOrder = (order: Order) => {
+    if (editingOrders.has(order.id)) {
+      clearAdjustment(order.id);
+      return;
+    }
+    setDraftItems(prev => ({
+      ...prev,
+      [order.id]: getOrderItems(order).map(item => ({ ...item }))
+    }));
+    setEditingOrders(prev => new Set(prev).add(order.id));
+  };
+
+  // Quantities can only go down: this flow is for shortfalls at delivery, not upsells.
+  const setItemQuantity = (order: Order, index: number, quantity: number) => {
+    const orderedQuantity = getOrderItems(order)[index]?.quantity ?? 0;
+    const nextQuantity = Math.max(0, Math.min(orderedQuantity, Math.floor(quantity) || 0));
+
+    setDraftItems(prev => {
+      const current = prev[order.id] ?? getOrderItems(order).map(item => ({ ...item }));
+      return {
+        ...prev,
+        [order.id]: current.map((item, i) =>
+          i === index
+            ? { ...item, quantity: nextQuantity, total: (item.price || 0) * nextQuantity }
+            : item
+        )
+      };
+    });
   };
 
   const handleMarkAsDelivered = async (order: Order) => {
@@ -236,6 +315,17 @@ export default function OrdersList() {
       return;
     }
 
+    const chargeAmount = getChargeAmount(order);
+    const adjusted = isAdjusted(order);
+
+    if (chargeAmount < MIN_CHARGE_AMOUNT) {
+      setCaptureMessages(prev => ({
+        ...prev,
+        [order.id]: `Error: Amount must be at least ${formatCurrency(MIN_CHARGE_AMOUNT)} to collect a payment.`
+      }));
+      return;
+    }
+
     setCapturingPayments(prev => new Set(prev).add(order.id));
     setCaptureMessages(prev => ({ ...prev, [order.id]: '' }));
 
@@ -244,18 +334,33 @@ export default function OrdersList() {
         order.stripePaymentIntentId || undefined,
         order.stripeCustomerId,
         order.stripePaymentMethodId || undefined,
-        order.totalAmount,
-        order.id
+        chargeAmount,
+        order.id,
+        adjusted
+          ? {
+              originalAmount: order.totalAmount,
+              reason: adjustmentReasons[order.id]?.trim() || undefined,
+              items: (draftItems[order.id] ?? []).map(({ id, name, price, quantity }) => ({
+                id,
+                name,
+                price,
+                quantity
+              }))
+            }
+          : undefined
       );
       
       if (result.success) {
         setCaptureMessages(prev => ({ 
           ...prev, 
-          [order.id]: 'Payment captured successfully!' 
+          [order.id]: adjusted
+            ? `Payment of ${formatCurrency(chargeAmount)} captured successfully (order total was ${formatCurrency(order.totalAmount)}).`
+            : 'Payment captured successfully!'
         }));
 
         // Refresh orders to show updated payment status
         setTimeout(() => {
+          clearAdjustment(order.id);
           fetchOrders();
           setCaptureMessages(prev => {
             const newMessages = { ...prev };
@@ -476,9 +581,20 @@ export default function OrdersList() {
                         </div>
                       </div>
                       <div className="text-left sm:text-right">
-                        <p className="text-lg lg:text-xl font-bold text-black">
-                          {formatCurrency(order.totalAmount)}
-                        </p>
+                        {isAdjusted(order) ? (
+                          <div className="flex items-center gap-2 sm:justify-end">
+                            <span className="text-sm text-gray-400 line-through">
+                              {formatCurrency(order.totalAmount)}
+                            </span>
+                            <p className="text-lg lg:text-xl font-bold text-amber-700">
+                              {formatCurrency(getChargeAmount(order))}
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-lg lg:text-xl font-bold text-black">
+                            {formatCurrency(getOrderAmount(order))}
+                          </p>
+                        )}
                         {order.status && (
                           <span className={`inline-block px-2.5 py-1 text-xs font-semibold rounded-full mt-1 shadow-sm ${
                             order.status === 'delivered' 
@@ -518,16 +634,100 @@ export default function OrdersList() {
                     )}
                     
                     <div className="space-y-1 lg:space-y-2">
-                      {(order.items || order.items || []).map((item: OrderItem, index) => (
-                        <div key={index} className="flex justify-between text-xs lg:text-sm">
-                          <span className="text-gray-700">
-                            {item.name} x{item.quantity}
-                          </span>
-                          <span className="text-gray-600">
-                            {formatCurrency(item.price || 0 * item.quantity || 0)}
-                          </span>
-                        </div>
-                      ))}
+                      {editingOrders.has(order.id) ? (
+                        <>
+                          {(draftItems[order.id] ?? []).map((item: OrderItem, index) => {
+                            const orderedQuantity = getOrderItems(order)[index]?.quantity ?? 0;
+                            return (
+                              <div key={index} className="flex flex-wrap items-center justify-between gap-2 text-xs lg:text-sm">
+                                <span className="flex-1 min-w-[8rem] text-gray-700">
+                                  {item.name}
+                                  <span className="text-gray-400"> · {formatCurrency(item.price || 0)} ea</span>
+                                  {item.quantity !== orderedQuantity && (
+                                    <span className="text-amber-600"> (ordered {orderedQuantity})</span>
+                                  )}
+                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setItemQuantity(order, index, item.quantity - 1)}
+                                    disabled={item.quantity <= 0}
+                                    aria-label={`Decrease ${item.name}`}
+                                    className="w-7 h-7 rounded-lg bg-gray-100 text-gray-700 font-bold hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
+                                  >
+                                    −
+                                  </button>
+                                  <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    min={0}
+                                    max={orderedQuantity}
+                                    value={item.quantity}
+                                    onChange={(e) => setItemQuantity(order, index, Number(e.target.value))}
+                                    aria-label={`Quantity delivered for ${item.name}`}
+                                    className="w-12 h-7 text-center text-gray-900 border border-gray-300 rounded-lg"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setItemQuantity(order, index, item.quantity + 1)}
+                                    disabled={item.quantity >= orderedQuantity}
+                                    aria-label={`Increase ${item.name}`}
+                                    className="w-7 h-7 rounded-lg bg-gray-100 text-gray-700 font-bold hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
+                                  >
+                                    +
+                                  </button>
+                                  <span className="w-16 text-right text-gray-600">
+                                    {formatCurrency(getLineTotal(item))}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setItemQuantity(order, index, 0)}
+                                    disabled={item.quantity === 0}
+                                    title="Sold out — remove from this delivery"
+                                    aria-label={`Remove ${item.name} from this delivery`}
+                                    className="w-7 h-7 rounded-lg text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          <div className="flex justify-between pt-2 mt-1 border-t border-gray-200 text-sm font-semibold text-gray-900">
+                            <span>Amount to collect</span>
+                            <span>{formatCurrency(getChargeAmount(order))}</span>
+                          </div>
+
+                          <input
+                            type="text"
+                            value={adjustmentReasons[order.id] ?? ''}
+                            onChange={(e) =>
+                              setAdjustmentReasons(prev => ({ ...prev, [order.id]: e.target.value }))
+                            }
+                            maxLength={500}
+                            placeholder="Reason (optional) — e.g. sourdough sold out"
+                            className="w-full mt-2 px-3 py-2 text-xs lg:text-sm text-gray-900 placeholder-gray-400 border border-gray-300 rounded-lg"
+                          />
+
+                          {getChargeAmount(order) < MIN_CHARGE_AMOUNT && (
+                            <p className="mt-1 text-xs text-amber-700">
+                              Below the {formatCurrency(MIN_CHARGE_AMOUNT)} minimum charge — mark the order as delivered without collecting a payment.
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        getOrderItems(order).map((item: OrderItem, index) => (
+                          <div key={index} className="flex justify-between text-xs lg:text-sm">
+                            <span className="text-gray-700">
+                              {item.name} x{item.quantity}
+                            </span>
+                            <span className="text-gray-600">
+                              {formatCurrency(getLineTotal(item))}
+                            </span>
+                          </div>
+                        ))
+                      )}
                       
                       {order.comments && (
                         <div className="flex justify-between text-xs lg:text-sm border-t pt-2">
@@ -566,16 +766,39 @@ export default function OrdersList() {
 
                         {/* Action Buttons */}
                         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                          {/* Adjust Order Button - collect less when an item is short */}
+                          {(order.stripePaymentIntentId || (order.stripeCustomerId && order.stripePaymentMethodId)) && (
+                            <button
+                              onClick={() => toggleAdjustOrder(order)}
+                              disabled={capturingPayments.has(order.id) || order.stripePaymentStatus === 'succeeded'}
+                              className={`px-4 py-2.5 sm:py-3 rounded-xl text-sm sm:text-base font-semibold transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg ${
+                                order.stripePaymentStatus === 'succeeded' || capturingPayments.has(order.id)
+                                  ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                                  : editingOrders.has(order.id)
+                                  ? 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                                  : 'bg-white text-amber-700 border-2 border-amber-300 hover:bg-amber-50'
+                              }`}
+                            >
+                              {editingOrders.has(order.id) ? 'Cancel adjustment' : 'Adjust order'}
+                            </button>
+                          )}
+
                           {/* Capture Payment Button */}
                           {(order.stripePaymentIntentId || (order.stripeCustomerId && order.stripePaymentMethodId)) && (
                             <button
                               onClick={() => handleCapturePayment(order)}
-                              disabled={capturingPayments.has(order.id) || order.stripePaymentStatus === 'succeeded'}
+                              disabled={
+                                capturingPayments.has(order.id) ||
+                                order.stripePaymentStatus === 'succeeded' ||
+                                getChargeAmount(order) < MIN_CHARGE_AMOUNT
+                              }
                               className={`flex-1 px-4 py-2.5 sm:py-3 rounded-xl text-sm sm:text-base font-semibold transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg ${
-                                order.stripePaymentStatus === 'succeeded'
+                                order.stripePaymentStatus === 'succeeded' || getChargeAmount(order) < MIN_CHARGE_AMOUNT
                                   ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
                                   : capturingPayments.has(order.id)
                                   ? 'bg-blue-300 text-white cursor-not-allowed'
+                                  : isAdjusted(order)
+                                  ? 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white'
                                   : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white'
                               }`}
                             >
@@ -589,6 +812,8 @@ export default function OrdersList() {
                                 </span>
                               ) : order.stripePaymentStatus === 'succeeded' ? (
                                 'Payment Captured ✓'
+                              ) : isAdjusted(order) ? (
+                                `Collect ${formatCurrency(getChargeAmount(order))}`
                               ) : (
                                 'Collect Payment'
                               )}
