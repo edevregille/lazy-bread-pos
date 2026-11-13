@@ -44,47 +44,27 @@ async function updateOrderPaymentInfo(
       console.warn('SERVICE_ORDERS_MGT_API_URL not configured, cannot update order');
       return;
     }
-    // Fields the orders API has always accepted
-    const baseFields = {
-      orderId: orderId,
-      paymentIntentId: paymentIntentId,
-      stripePaymentStatus: paymentStatus
-    };
-
-    const putOrder = (body: object) =>
-      fetch(`${ordersApiUrl}/orders`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body)
-      });
-
-    const updateResponse = await putOrder({
-      ...baseFields,
-      amountCollected: adjustment.amountCollected,
-      ...(adjustment.originalAmount !== undefined && { originalAmount: adjustment.originalAmount }),
-      ...(adjustment.adjustmentReason && { adjustmentReason: adjustment.adjustmentReason }),
-      ...(adjustment.adjustedItems && { adjustedItems: adjustment.adjustedItems })
+    // amountCollected records what was actually charged, which can be less than the
+    // order total when an item was short at delivery.
+    const updateResponse = await fetch(`${ordersApiUrl}/orders`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        orderId: orderId,
+        paymentIntentId: paymentIntentId,
+        stripePaymentStatus: paymentStatus,
+        amountCollected: adjustment.amountCollected,
+        ...(adjustment.originalAmount !== undefined && { originalAmount: adjustment.originalAmount }),
+        ...(adjustment.adjustmentReason && { adjustmentReason: adjustment.adjustmentReason }),
+        ...(adjustment.adjustedItems && { adjustedItems: adjustment.adjustedItems })
+      })
     });
 
     if (!updateResponse.ok) {
       const errorData = await updateResponse.json().catch(() => ({ error: 'Unknown error' }));
       console.error(`Failed to update order ${orderId}:`, updateResponse.status, errorData);
-
-      // The amount/adjustment fields are additive. If the orders API rejects them,
-      // retry with only the fields it already supports so a successful capture never
-      // leaves the order without its payment intent ID and status.
-      const retryResponse = await putOrder(baseFields);
-      if (retryResponse.ok) {
-        console.warn(
-          `Order ${orderId} updated without adjustment fields; the orders API rejected them. ` +
-          `The adjustment is still recorded in the payment intent metadata.`
-        );
-      } else {
-        const retryError = await retryResponse.json().catch(() => ({ error: 'Unknown error' }));
-        console.error(`Retry without adjustment fields also failed for order ${orderId}:`, retryResponse.status, retryError);
-      }
     }
   } catch (updateError) {
     console.error('Error updating order with payment info:', updateError);
