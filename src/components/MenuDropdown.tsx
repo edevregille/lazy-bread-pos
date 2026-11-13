@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 
 type TabType = 'pos' | 'orders' | 'subscriptions' | 'customers' | 'revenue' | 'webAnalytics' | 'settings';
 
@@ -48,13 +48,9 @@ export default function MenuDropdown({ activeTab, onTabChange }: MenuDropdownPro
     };
   }, [isOpen]);
 
-  const handleGoogleLogin = () => {
-    if (session) {
-      signOut();
-    } else {
-      signIn("google");
-    }
+  const handleSignOut = () => {
     setIsOpen(false);
+    signOut({ callbackUrl: "/login" });
   };
 
   const handleTabClick = (tab: TabType) => {
@@ -120,16 +116,19 @@ export default function MenuDropdown({ activeTab, onTabChange }: MenuDropdownPro
             {/* Divider */}
             <div className="my-2 border-t border-gray-200"></div>
 
-            {/* Sign In/Out Button */}
+            {/* Signed-in user + Sign Out (signed-out visitors never reach this page) */}
+            {session?.user?.email && (
+              <div className="px-4 pt-1 pb-2 text-xs text-gray-500 truncate">
+                Signed in as {session.user.email}
+              </div>
+            )}
             <button
-              onClick={handleGoogleLogin}
+              onClick={handleSignOut}
               className="w-full flex items-center space-x-3 px-4 py-3 text-left transition-all duration-200 hover:bg-gray-50"
             >
-              <span className="text-2xl">
-                {session ? '🚪' : '🔑'}
-              </span>
+              <span className="text-2xl">🚪</span>
               <span className="font-semibold text-sm sm:text-base text-gray-700 flex-1">
-                {session ? 'Sign Out' : 'Sign In'}
+                Sign Out
               </span>
             </button>
           </div>

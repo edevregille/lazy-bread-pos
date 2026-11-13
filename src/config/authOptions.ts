@@ -14,6 +14,10 @@ export const authOptions: AuthOptions = {
     }),
   ],
   secret: process.env.NEXTAUTH_SECRET,
+  pages: {
+    signIn: "/login",
+    error: "/login", // e.g. ?error=AccessDenied for accounts not in ALLOWED_EMAILS
+  },
   callbacks: {
     async signIn({ user }) {
       if (user.email && ALLOWED_EMAILS.includes(user.email)) {
