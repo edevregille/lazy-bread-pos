@@ -13,8 +13,6 @@ interface AppConfig {
     availableForOrders: boolean;
     /** Public S3 URL of the bread photo (uploaded below). */
     image_url?: string;
-    /** @deprecated Legacy filename in the web repo's public/breads folder. */
-    image_name?: string;
   }>;
   BUSINESS_SETTINGS?: {
     isHolidayMode: boolean;
@@ -202,7 +200,6 @@ export default function SettingsPanel() {
       const imageUrl = await uploadBreadImage(configApiUrl, breadId, file);
       updateBread(breadId, (bread) => {
         bread.image_url = imageUrl;
-        delete bread.image_name;
         return bread;
       });
     } catch (err) {
@@ -219,7 +216,6 @@ export default function SettingsPanel() {
     setImageErrors((prev) => ({ ...prev, [breadId]: null }));
     updateBread(breadId, (bread) => {
       delete bread.image_url;
-      delete bread.image_name;
       return bread;
     });
   };
@@ -488,9 +484,7 @@ export default function SettingsPanel() {
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={bread.image_url} alt={bread.name || 'Bread image'} className="w-full h-full object-cover" />
                             ) : (
-                              <span className="text-[10px] text-gray-500 text-center px-1">
-                                {bread.image_name ? `Legacy: ${bread.image_name}` : 'No image'}
-                              </span>
+                              <span className="text-[10px] text-gray-500 text-center px-1">No image</span>
                             )}
                           </div>
                           <div className="flex flex-col gap-1.5">
@@ -503,7 +497,7 @@ export default function SettingsPanel() {
                             >
                               {imageUploading[bread.id]
                                 ? 'Uploading...'
-                                : bread.image_url || bread.image_name
+                                : bread.image_url
                                   ? 'Replace image'
                                   : 'Upload image'}
                               <input
@@ -517,7 +511,7 @@ export default function SettingsPanel() {
                                 }}
                               />
                             </label>
-                            {(bread.image_url || bread.image_name) && !imageUploading[bread.id] && (
+                            {bread.image_url && !imageUploading[bread.id] && (
                               <button
                                 type="button"
                                 onClick={() => handleBreadImageRemoved(bread.id)}
