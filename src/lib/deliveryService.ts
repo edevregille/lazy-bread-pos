@@ -115,3 +115,29 @@ export const capturePayment = async (
     }
       
 };  
+
+// Cancel an order the customer no longer wants: permanently deletes it (and releases any
+// uncaptured card hold). See /api/orders/cancel.
+export const cancelOrder = async (
+  orderId: string,
+  stripePaymentIntentId?: string | null
+): Promise<Result> => {
+  try {
+    const response = await fetch('/api/orders/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId, stripePaymentIntentId: stripePaymentIntentId || undefined }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || 'Failed to cancel order');
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Error cancelling order:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to cancel order',
+    };
+  }
+};

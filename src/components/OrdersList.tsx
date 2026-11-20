@@ -6,6 +6,7 @@ import {
    markOrderAsDelivered, 
    Result, 
    capturePayment,
+   cancelOrder,
    formatDeliveryDate,
 } from '@/lib/deliveryService';
 
@@ -71,6 +72,11 @@ export default function OrdersList() {
   const [editingOrders, setEditingOrders] = useState<Set<string>>(new Set());
   const [draftItems, setDraftItems] = useState<Record<string, OrderItem[]>>({});
   const [adjustmentReasons, setAdjustmentReasons] = useState<Record<string, string>>({});
+  // "Cancel order" confirmation dialog
+  const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
+  const [cancellingOrder, setCancellingOrder] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelNotice, setCancelNotice] = useState<string | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -80,7 +86,8 @@ export default function OrdersList() {
     if (orders.length > 0) {
       const groups = groupOrdersByDeliveryDate(orders);
       setDeliveryDateGroups(groups);
-      if (groups.length > 0 && !selectedDeliveryDate) {
+      // Also re-select when the selected date has no orders left (e.g. its last order was cancelled).
+      if (groups.length > 0 && (!selectedDeliveryDate || !groups.some(g => g.date === selectedDeliveryDate))) {
         setSelectedDeliveryDate(groups[0].date);
       }
     }
@@ -388,6 +395,49 @@ export default function OrdersList() {
     }
   };
 
+  const openCancelDialog = (order: Order) => {
+    setCancelError(null);
+    setOrderToCancel(order);
+  };
+
+  const closeCancelDialog = () => {
+    if (cancellingOrder) return;
+    setOrderToCancel(null);
+    setCancelError(null);
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!orderToCancel || cancellingOrder) return;
+    const order = orderToCancel;
+
+    setCancellingOrder(true);
+    setCancelError(null);
+    try {
+      const result: Result = await cancelOrder(order.id, order.stripePaymentIntentId);
+      if (!result.success) {
+        setCancelError(result.error || 'Failed to cancel order');
+        return;
+      }
+      clearAdjustment(order.id);
+      setOrders(prev => prev.filter(o => o.id !== order.id));
+      setOrderToCancel(null);
+      setCancelNotice(`Order for ${order.customerName || 'customer'} was cancelled and deleted.`);
+      setTimeout(() => setCancelNotice(null), 4000);
+    } finally {
+      setCancellingOrder(false);
+    }
+  };
+
+  // Close the dialog with Escape (not while the delete is in flight).
+  useEffect(() => {
+    if (!orderToCancel) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeCancelDialog();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  });
+
   const selectedGroup = deliveryDateGroups.find(group => group.date === selectedDeliveryDate);
 
   if (loading) {
@@ -517,6 +567,11 @@ export default function OrdersList() {
               <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 mb-4 sm:mb-5">
                 Orders ({selectedGroup.orders.length})
               </h3>
+              {cancelNotice && (
+                <div role="status" className="mb-4 px-4 py-3 text-sm text-green-800 bg-green-50 border border-green-200 rounded-xl">
+                  {cancelNotice}
+                </div>
+              )}
               
               <div className="space-y-3 sm:space-y-4">
                 {selectedGroup.orders.map((order) => (
@@ -846,6 +901,24 @@ export default function OrdersList() {
                               'Mark as Delivered'
                             )}
                           </button>
+
+                          {/* Cancel Order Button - customer changed their mind; deletes the order */}
+                          <button
+                            onClick={() => openCancelDialog(order)}
+                            disabled={order.stripePaymentStatus === 'succeeded' || capturingPayments.has(order.id)}
+                            title={
+                              order.stripePaymentStatus === 'succeeded'
+                                ? 'Payment was already collected. Refund it in Stripe before deleting this order.'
+                                : 'Permanently delete this order'
+                            }
+                            className={`px-4 py-2.5 sm:py-3 rounded-xl text-sm sm:text-base font-semibold transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg ${
+                              order.stripePaymentStatus === 'succeeded' || capturingPayments.has(order.id)
+                                ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                                : 'bg-white text-red-600 border-2 border-red-300 hover:bg-red-50'
+                            }`}
+                          >
+                            Cancel order
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -856,6 +929,68 @@ export default function OrdersList() {
           </div>
         )}
       </div>
+
+      {/* Cancel order confirmation */}
+      {orderToCancel && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={closeCancelDialog}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="cancel-order-title"
+            aria-describedby="cancel-order-description"
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="cancel-order-title" className="text-xl font-bold text-gray-900 mb-3">
+              Cancel and permanently delete this order?
+            </h3>
+
+            <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 space-y-1">
+              <p className="font-semibold text-gray-900">{orderToCancel.customerName || 'No name provided'}</p>
+              {orderToCancel.email && <p>{orderToCancel.email}</p>}
+              <p>{formatShortDate(orderToCancel.deliveryDate)} · {formatCurrency(getOrderAmount(orderToCancel))}</p>
+              <ul className="pt-1">
+                {getOrderItems(orderToCancel).map((item, index) => (
+                  <li key={index}>{item.name} x{item.quantity}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div id="cancel-order-description" className="mb-5 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800 space-y-1">
+              <p className="font-semibold">This order will be permanently deleted. This cannot be undone.</p>
+              <p>It will disappear from the POS and its bread will no longer count in the bread summary.</p>
+              <p>The customer will not be charged and will not be notified. Let them know yourself if needed.</p>
+            </div>
+
+            {cancelError && (
+              <p className="mb-4 text-sm text-red-600">Error: {cancelError}</p>
+            )}
+
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 sm:justify-end">
+              <button
+                type="button"
+                autoFocus
+                onClick={closeCancelDialog}
+                disabled={cancellingOrder}
+                className="px-4 py-2.5 rounded-xl text-sm sm:text-base font-semibold bg-gray-100 text-gray-800 hover:bg-gray-200 disabled:opacity-50 transition-all active:scale-95"
+              >
+                Keep order
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCancel}
+                disabled={cancellingOrder}
+                className="px-4 py-2.5 rounded-xl text-sm sm:text-base font-semibold text-white bg-red-600 hover:bg-red-700 disabled:bg-red-300 disabled:cursor-not-allowed transition-all active:scale-95 shadow-md"
+              >
+                {cancellingOrder ? 'Deleting…' : 'Yes, delete order permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-} 
+}
